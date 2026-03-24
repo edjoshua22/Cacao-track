@@ -275,13 +275,7 @@ python prepare_data.py
 python train_model.py
 ```
 
-### Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## 📱 Screenshots
 
@@ -299,9 +293,6 @@ For support and questions:
 - Check the documentation in the `/docs` folder
 - Review the troubleshooting guide
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
