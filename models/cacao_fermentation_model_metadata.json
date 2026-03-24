@@ -1,0 +1,15 @@
+{
+  "model_name": "cacao_fermentation_model",
+  "img_size": 224,
+  "classes": [
+    "day0",
+    "day1",
+    "day2",
+    "day3",
+    "day4",
+    "day5",
+    "day6"
+  ],
+  "num_classes": 7,
+  "timestamp": "2025-12-30T16:26:58.214314"
+}

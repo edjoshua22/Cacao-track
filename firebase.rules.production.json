@@ -1,0 +1,70 @@
+{
+  "rules": {
+    "sensorData": {
+      ".read": true,
+      ".write": false
+    },
+    "DHT1": {
+      ".read": true,
+      ".write": false
+    },
+    "DHT2": {
+      ".read": true,
+      ".write": false
+    },
+    "Average": {
+      ".read": true,
+      ".write": false
+    },
+    "history": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "captures": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "batches": {
+      "$uid": {
+        "$batchId": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "!newData.exists() || newData.hasChildren(['name','createdAt','status'])"
+        }
+      }
+    },
+    "notifications": {
+      "$uid": {
+        "$notificationId": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "!newData.exists() || newData.hasChildren(['type', 'title', 'message', 'timestamp', 'read'])",
+
+          "type": {
+            ".validate": "!newData.exists() || (newData.isString() && (newData.val() === 'alert' || newData.val() === 'warning' || newData.val() === 'info'))"
+          },
+
+          "title": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length > 0)"
+          },
+
+          "message": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length > 0)"
+          },
+
+          "timestamp": {
+            ".validate": "!newData.exists() || newData.isNumber()"
+          },
+
+          "read": {
+            ".validate": "!newData.exists() || newData.isBoolean()"
+          }
+        }
+      }
+    }
+  }
+}

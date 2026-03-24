@@ -1,0 +1,83 @@
+{
+  "rules": {
+    ".read": "(auth != null) || (root.child('settings').child('developmentMode').val() === true)",
+    ".write": "(auth != null) || (root.child('settings').child('developmentMode').val() === true)",
+
+    "sensorData": {
+      ".read": true,
+      ".write": "(auth != null) || (root.child('settings').child('developmentMode').val() === true)"
+    },
+    "DHT1": {
+      ".read": true,
+      ".write": "(auth != null) || (root.child('settings').child('developmentMode').val() === true)"
+    },
+    "DHT2": {
+      ".read": true,
+      ".write": "(auth != null) || (root.child('settings').child('developmentMode').val() === true)"
+    },
+    "Average": {
+      ".read": true,
+      ".write": "(auth != null) || (root.child('settings').child('developmentMode').val() === true)"
+    },
+    "history": {
+      "$uid": {
+        ".read": "((auth != null) && (auth.uid === $uid)) || (root.child('settings').child('developmentMode').val() === true)",
+        ".write": "((auth != null) && (auth.uid === $uid)) || (root.child('settings').child('developmentMode').val() === true)"
+      }
+    },
+    "captures": {
+      ".read": "auth != null || (root.child('settings').child('developmentMode').val() === true)",
+      ".write": "auth != null || (root.child('settings').child('developmentMode').val() === true)",
+      "$uid": {
+        ".read": "((auth != null) && (auth.uid === $uid)) || (root.child('settings').child('developmentMode').val() === true)",
+        ".write": "((auth != null) && (auth.uid === $uid)) || (root.child('settings').child('developmentMode').val() === true)"
+      }
+    },
+    "batches": {
+      ".read": "auth != null || (root.child('settings').child('developmentMode').val() === true)",
+      ".write": "auth != null || (root.child('settings').child('developmentMode').val() === true)",
+      "$uid": {
+        "$batchId": {
+          ".read": "((auth != null) && (auth.uid === $uid)) || (root.child('settings').child('developmentMode').val() === true)",
+          ".write": "((auth != null) && (auth.uid === $uid)) || (root.child('settings').child('developmentMode').val() === true)",
+          ".validate": "!newData.exists() || newData.hasChildren(['name','createdAt','status'])"
+        }
+      }
+    },
+    "notifications": {
+      "$uid": {
+        "$notificationId": {
+          ".read": "((auth != null) && (auth.uid === $uid)) || (root.child('settings').child('developmentMode').val() === true)",
+          ".write": "((auth != null) && (auth.uid === $uid)) || (root.child('settings').child('developmentMode').val() === true)",
+          ".validate": "!newData.exists() || newData.hasChildren(['type', 'title', 'message', 'timestamp', 'read'])",
+
+          "type": {
+            ".validate": "!newData.exists() || (newData.isString() && (newData.val() === 'alert' || newData.val() === 'warning' || newData.val() === 'info'))"
+          },
+
+          "title": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length > 0)"
+          },
+
+          "message": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length > 0)"
+          },
+
+          "timestamp": {
+            ".validate": "!newData.exists() || newData.isNumber()"
+          },
+
+          "read": {
+            ".validate": "!newData.exists() || newData.isBoolean()"
+          }
+        }
+      }
+    },
+    "settings": {
+      "developmentMode": {
+        ".read": false,
+        ".write": false
+      }
+    }
+  }
+}
