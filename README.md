@@ -285,7 +285,12 @@ python train_model.py
 
 ## 📱 Screenshots
 
-*Add screenshots of your app here*
+![c0614d10-57ba-41be-91a1-a1fe104a92d2](https://github.com/user-attachments/assets/d6df3f67-0a2e-4341-b3dc-ac09487a0c43)
+![350987ec-749d-49b2-ab74-1ac210125d51](https://github.com/user-attachments/assets/5d8c73ae-9f2a-4964-b31c-0e3ce3ea58f3)
+![3e8bbc9d-8d56-4d97-a1e1-de90a2875f68](https://github.com/user-attachments/assets/32cca3f9-205b-47a6-bea9-f48181fe7160)
+![47b3cfcd-12f5-4a12-a83f-8e41e5122b3b](https://github.com/user-attachments/assets/2b8ef18d-8efd-4b4f-bace-9aef1fe04965)
+![0a6435b9-493e-4650-b7b2-cea9ba78bb55](https://github.com/user-attachments/assets/48fcef33-9bcb-4267-aad9-4e1f7e26b853)
+
 
 ## 🤝 Support
 
