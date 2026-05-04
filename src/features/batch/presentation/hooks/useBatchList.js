@@ -48,10 +48,12 @@ function processBatchData(batchData, batchId, endTime = Infinity) {
         // Ensure data belongs strictly to this batch's timeline
         if (entryTime >= startTime && entryTime < endTime) {
           let dayIndex = Math.floor((entryTime - startTime) / DAY_MS);
-          if (dayIndex < 0) dayIndex = 0;
-          if (dayIndex > 6) dayIndex = 6;
-          const dayKey = `day${dayIndex}`;
-          if (processedBatch[dayKey]) processedBatch[dayKey].sensorData.push(entry);
+          if (dayIndex >= 0 && dayIndex <= 6) {
+            const dayKey = `day${dayIndex}`;
+            if (processedBatch[dayKey]) {
+              processedBatch[dayKey].sensorData.push(entry);
+            }
+          }
         }
       });
 

@@ -54,7 +54,8 @@ export class GetAnalyticsDataUseCase {
           dayGroups,
           stats,
           latest,
-          totalReadings: entries.length
+          totalReadings: entries.length,
+          rawEntries: entries
         });
       } catch (err) {
         console.error('[GetAnalyticsDataUseCase] processing error:', err);

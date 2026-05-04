@@ -249,7 +249,7 @@ function LineChart({
           height={chartHeight}
           withDots={datasets.length > 0}  // Only show dots if datasets exist
           withShadow={false}
-          bezier
+          bezier={safeLabels.length >= 3}
           segments={6}
           fromZero={false}
           yAxisSuffix=""

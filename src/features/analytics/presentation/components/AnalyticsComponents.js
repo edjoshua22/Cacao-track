@@ -5,13 +5,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import LineChart from "../../../../../components/LineChart";
 
 const STAGE_META = [
-  { name: "Day 0 — Fresh",                color: "#8B5A2B", emoji: "🌱" },
-  { name: "Day 1 — Anaerobic",            color: "#7C3AED", emoji: "🫙" },
-  { name: "Day 2 — Anaerobic/Alcoholic",  color: "#3B82F6", emoji: "⚗️" },
-  { name: "Day 3 — Aerobic",              color: "#10B981", emoji: "☀️" },
-  { name: "Day 4 — Aerobic",              color: "#059669", emoji: "☀️" },
-  { name: "Day 5 — Maturation",           color: "#F59E0B", emoji: "⏳" },
-  { name: "Day 6 — Drying Ready",         color: "#EF4444", emoji: "✅" },
+  { name: "Day 0 — Fresh", color: "#8B5A2B", emoji: "🌱" },
+  { name: "Day 1 — Anaerobic", color: "#7C3AED", emoji: "🫙" },
+  { name: "Day 2 — Anaerobic/Alcoholic", color: "#3B82F6", emoji: "⚗️" },
+  { name: "Day 3 — Aerobic", color: "#10B981", emoji: "☀️" },
+  { name: "Day 4 — Aerobic", color: "#059669", emoji: "☀️" },
+  { name: "Day 5 — Maturation", color: "#F59E0B", emoji: "⏳" },
+  { name: "Day 6 — Drying Ready", color: "#EF4444", emoji: "✅" },
 ];
 
 // ── Stat pill ────────────────────────────────────────────────────────────────
@@ -26,8 +26,8 @@ export function StatPill({ icon, label, value, unit, color }) {
 }
 const P = StyleSheet.create({
   wrap: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
-  lbl:  { fontSize: 10, fontWeight: "600" },
-  val:  { fontSize: 11, fontWeight: "800" },
+  lbl: { fontSize: 10, fontWeight: "600" },
+  val: { fontSize: 11, fontWeight: "800" },
 });
 
 // ── Section header ────────────────────────────────────────────────────────────
@@ -44,10 +44,10 @@ export function SectionHeader({ emoji, title, subtitle, color, colors }) {
   );
 }
 const SHS = StyleSheet.create({
-  wrap:  { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 10, marginBottom: 14, marginTop: 6 },
-  bar:   { width: 4, height: 36, borderRadius: 2 },
+  wrap: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 10, marginBottom: 14, marginTop: 6 },
+  bar: { width: 4, height: 36, borderRadius: 2 },
   title: { fontSize: 15, fontWeight: "800", letterSpacing: -0.3 },
-  sub:   { fontSize: 11, marginTop: 2 },
+  sub: { fontSize: 11, marginTop: 2 },
 });
 
 // ── Day card (per calendar date) ─────────────────────────────────────────────
@@ -60,7 +60,7 @@ export const DayCard = React.memo(({ index, dateStr, entries, series, stats, col
   const toggle = () => {
     const next = !expanded;
     setExpanded(next);
-    
+
     if (next) {
       // Defer the heavy chart rendering
       setTimeout(() => setShowChart(true), 150);
@@ -114,11 +114,11 @@ export const DayCard = React.memo(({ index, dateStr, entries, series, stats, col
           <View style={DC.body}>
             {/* Stat pills */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={DC.pills}>
-              <StatPill icon="thermometer-outline" label="Avg Temp"  value={stats.tempAvg}  unit="°C" color="#EF4444" />
-              <StatPill icon="thermometer"         label="Max Temp"  value={stats.tempMax}  unit="°C" color="#F87171" />
-              <StatPill icon="water-outline"       label="Avg Humid" value={stats.humidAvg} unit="%"  color="#3B82F6" />
-              <StatPill icon="water"               label="Max Humid" value={stats.humidMax} unit="%"  color="#60A5FA" />
-              <StatPill icon="leaf-outline"        label="Avg Moist" value={stats.moistAvg} unit="%"  color="#10B981" />
+              <StatPill icon="thermometer-outline" label="Avg Temp" value={stats.tempAvg} unit="°C" color="#EF4444" />
+              <StatPill icon="thermometer" label="Max Temp" value={stats.tempMax} unit="°C" color="#F87171" />
+              <StatPill icon="water-outline" label="Avg Humid" value={stats.humidAvg} unit="%" color="#3B82F6" />
+              <StatPill icon="water" label="Max Humid" value={stats.humidMax} unit="%" color="#60A5FA" />
+              <StatPill icon="leaf-outline" label="Avg Moist" value={stats.moistAvg} unit="%" color="#10B981" />
             </ScrollView>
 
             {/* Chart */}
@@ -150,19 +150,19 @@ export const DayCard = React.memo(({ index, dateStr, entries, series, stats, col
 });
 
 const DC = StyleSheet.create({
-  card:     { borderRadius: 20, borderWidth: 1.5, marginBottom: 16, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
-  stripe:   { height: 4 },
-  hdr:      { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 14 },
-  badge:    { width: 38, height: 38, borderRadius: 19, justifyContent: "center", alignItems: "center", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  card: { borderRadius: 20, borderWidth: 1.5, marginBottom: 16, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
+  stripe: { height: 4 },
+  hdr: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 14 },
+  badge: { width: 38, height: 38, borderRadius: 19, justifyContent: "center", alignItems: "center", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   badgeNum: { color: "#fff", fontWeight: "900", fontSize: 16 },
-  name:     { fontSize: 14, fontWeight: "800", letterSpacing: -0.3 },
-  sub:      { fontSize: 11, marginTop: 2 },
-  chip:     { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
-  dot:      { width: 6, height: 6, borderRadius: 3 },
-  chipTxt:  { fontSize: 10, fontWeight: "700" },
-  body:     { paddingBottom: 10 },
-  pills:    { gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
-  chartWrap:{ borderRadius: 14, marginHorizontal: 10, marginBottom: 10, overflow: "hidden", padding: 4 },
-  empty:    { alignItems: "center", paddingVertical: 28, gap: 8 },
+  name: { fontSize: 14, fontWeight: "800", letterSpacing: -0.3 },
+  sub: { fontSize: 11, marginTop: 2 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  chipTxt: { fontSize: 10, fontWeight: "700" },
+  body: { paddingBottom: 10 },
+  pills: { gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
+  chartWrap: { borderRadius: 14, marginHorizontal: 10, marginBottom: 10, overflow: "hidden", padding: 4 },
+  empty: { alignItems: "center", paddingVertical: 28, gap: 8 },
   emptyTxt: { fontSize: 13, fontWeight: "500" },
 });

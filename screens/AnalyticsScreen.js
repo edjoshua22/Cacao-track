@@ -19,13 +19,12 @@ import { createBatch } from './Menu/batchUtils';
 import { SectionHeader as SH, DayCard } from '../src/features/analytics/presentation/components/AnalyticsComponents';
 import { HeroCard } from '../src/features/analytics/presentation/components/HeroCard';
 import { OverviewChartCard } from '../src/features/analytics/presentation/components/OverviewChartCard';
-import { LatestReadingCard } from '../src/features/analytics/presentation/components/LatestReadingCard';
 
 export default function AnalyticsScreen() {
   const { colors, isDark, toggleTheme } = useAppTheme();
-  
+
   const { batches, isLoading, error, deleteBatch } = useBatchList();
-  
+
   // Always default to 'batch-0' so the user sees all historical readings first
   const [selectedBatchId, setSelectedBatchId] = useState('batch-0');
   const [modalVisible, setModalVisible] = useState(false);
@@ -74,62 +73,93 @@ export default function AnalyticsScreen() {
 
   const batchViewData = useMemo(() => {
     if (!selectedBatch) return { dayGroups: [], totalReadings: 0, stats: null };
+
+    // Create base 7-day structure
+    const stages = [
+      { name: 'Fresh', entries: [] },
+      { name: 'Anaerobic', entries: [] },
+      { name: 'Anaerobic / Alcoholic', entries: [] },
+      { name: 'Aerobic', entries: [] },
+      { name: 'Aerobic', entries: [] },
+      { name: 'Maturation', entries: [] },
+      { name: 'Drying Ready', entries: [] },
+    ];
+
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const startTime = parseInt(selectedBatch.createdAt || selectedBatch.startTime || Date.now());
+
+    // Dynamically bucket real-time global entries strictly into this batch's 7-day window
+    if (globalViewData.rawEntries) {
+      globalViewData.rawEntries.forEach(entry => {
+        if (!entry || !entry.time) return;
+        let entryTime = entry.timestamp;
+        if (!entryTime) {
+          const parsed = new Date(entry.time.replace(/-/g, '/')).getTime();
+          entryTime = isNaN(parsed) ? startTime : parsed;
+        }
+
+        // Strictly drop data that is before the start time or after Day 6 (7 days later)
+        if (entryTime >= startTime) {
+          let dayIndex = Math.floor((entryTime - startTime) / DAY_MS);
+          if (dayIndex >= 0 && dayIndex <= 6) {
+            stages[dayIndex].entries.push(entry);
+          }
+        }
+      });
+    }
+
     const groups = [];
-    const daysArr = ['day0','day1','day2','day3','day4','day5','day6'];
     let totalR = 0;
     let globalTempSum = 0, globalHumidSum = 0, globalMoistSum = 0;
 
-    daysArr.forEach((dayKey, index) => {
-      const dayData = selectedBatch[dayKey];
-      if (dayData && dayData.sensorData) {
-        const len = dayData.sensorData.length;
-        totalR += len;
-        
-        const labels=[], tempDHT1=[], tempDHT2=[], humidDHT1=[], humidDHT2=[], moisture=[];
-        let tempSum=0, tempMax=0, humidSum=0, humidMax=0, moistSum=0;
-        
-        dayData.sensorData.forEach(e => {
-          labels.push(e.time ? String(e.time).split(' ')[1]||String(e.time) : '');
-          const t1 = Number(e.tempDHT1 ?? e.temperature ?? 0);
-          const t2 = Number(e.tempDHT2 ?? e.temperature ?? 0);
-          const h1 = Number(e.humidDHT1 ?? e.humidity ?? 0);
-          const h2 = Number(e.humidDHT2 ?? e.humidity ?? 0);
-          const m = Number(e.soilMoisture ?? 0);
-          
-          tempDHT1.push(t1); tempDHT2.push(t2);
-          humidDHT1.push(h1); humidDHT2.push(h2);
-          moisture.push(m);
-          
-          const avgT = (t1+t2)/2;
-          const avgH = (h1+h2)/2;
-          
-          tempSum += avgT; humidSum += avgH; moistSum += m;
-          globalTempSum += avgT; globalHumidSum += avgH; globalMoistSum += m;
-          
-          if(avgT > tempMax) tempMax = avgT;
-          if(avgH > humidMax) humidMax = avgH;
-        });
+    stages.forEach((stage, index) => {
+      const len = stage.entries.length;
+      totalR += len;
 
-        if (len === 0) {
-          labels.push('No Data');
-          tempDHT1.push(0); tempDHT2.push(0);
-          humidDHT1.push(0); humidDHT2.push(0);
-          moisture.push(0);
-        }
+      const labels = [], tempDHT1 = [], tempDHT2 = [], humidDHT1 = [], humidDHT2 = [], moisture = [];
+      let tempSum = 0, tempMax = 0, humidSum = 0, humidMax = 0, moistSum = 0;
 
-        groups.push({
-          dateStr: `Day ${index} — ${dayData.stageName}`,
-          entries: dayData.sensorData,
-          series: { labels, tempDHT1, tempDHT2, humidDHT1, humidDHT2, moisture, isEmpty: false },
-          stats: {
-            tempAvg: len ? tempSum/len : 0,
-            tempMax,
-            humidAvg: len ? humidSum/len : 0,
-            humidMax,
-            moistAvg: len ? moistSum/len : 0
-          }
-        });
+      stage.entries.forEach(e => {
+        labels.push(e.time ? String(e.time).split(' ')[1] || String(e.time) : '');
+        const t1 = Number(e.tempDHT1 ?? e.temperature ?? 0);
+        const t2 = Number(e.tempDHT2 ?? e.temperature ?? 0);
+        const h1 = Number(e.humidDHT1 ?? e.humidity ?? 0);
+        const h2 = Number(e.humidDHT2 ?? e.humidity ?? 0);
+        const m = Number(e.soilMoisture ?? 0);
+
+        tempDHT1.push(t1); tempDHT2.push(t2);
+        humidDHT1.push(h1); humidDHT2.push(h2);
+        moisture.push(m);
+
+        const avgT = (t1 + t2) / 2;
+        const avgH = (h1 + h2) / 2;
+
+        tempSum += avgT; humidSum += avgH; moistSum += m;
+        globalTempSum += avgT; globalHumidSum += avgH; globalMoistSum += m;
+
+        if (avgT > tempMax) tempMax = avgT;
+        if (avgH > humidMax) humidMax = avgH;
+      });
+
+      if (len === 0) {
+        labels.push('', '');
+        tempDHT1.push(0, 0); tempDHT2.push(0, 0);
+        humidDHT1.push(0, 0); humidDHT2.push(0, 0);
+        moisture.push(0, 0);
       }
+
+      groups.push({
+        dateStr: `Day ${index} — ${stage.name}`,
+        entries: stage.entries,
+        series: { labels, tempDHT1, tempDHT2, humidDHT1, humidDHT2, moisture, isEmpty: false },
+        stats: {
+          tempAvg: len ? tempSum / len : 0,
+          tempMax,
+          humidAvg: len ? humidSum / len : 0,
+          humidMax,
+          moistAvg: len ? moistSum / len : 0
+        }
+      });
     });
 
     const overallStats = {
@@ -139,7 +169,7 @@ export default function AnalyticsScreen() {
     };
 
     return { dayGroups: groups, totalReadings: totalR, stats: overallStats };
-  }, [selectedBatch]);
+  }, [selectedBatch, globalViewData.rawEntries]);
 
   const isGlobal = selectedBatchId === 'batch-0';
   const activeData = isGlobal ? globalViewData : batchViewData;
@@ -156,9 +186,9 @@ export default function AnalyticsScreen() {
       `Are you sure you want to delete ${batchName}? This action cannot be undone.`,
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
+        {
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             try {
               await deleteBatch(batchId);
@@ -166,7 +196,7 @@ export default function AnalyticsScreen() {
             } catch (err) {
               Alert.alert("Error", "Could not delete batch.");
             }
-          } 
+          }
         }
       ]
     );
@@ -178,7 +208,7 @@ export default function AnalyticsScreen() {
 
         {/* Header with Batch Selector */}
         <View style={S.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[S.headerLeft, { flex: 1, backgroundColor: colors.card, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border }]}
             onPress={() => setModalVisible(true)}
             activeOpacity={0.7}
@@ -204,24 +234,20 @@ export default function AnalyticsScreen() {
         ) : (
           <ScrollView contentContainerStyle={S.scroll} showsVerticalScrollIndicator={false}>
             {/* ── Hero card ── */}
-            <HeroCard 
-              stats={stats} 
-              isDark={isDark} 
-              dayGroupsLength={dayGroups.length} 
-              totalReadings={totalReadings} 
+            <HeroCard
+              stats={stats}
+              isDark={isDark}
+              dayGroupsLength={dayGroups.length}
+              totalReadings={totalReadings}
             />
 
-            {/* ── Overview chart & Latest Reading (Only for Batch 0) ── */}
+            {/* ── Overview chart (Only for Batch 1) ── */}
             {isGlobal && (
               <>
-                <OverviewChartCard 
-                  overviewSeries={overviewSeries} 
-                  totalReadings={totalReadings} 
-                  colors={colors} 
-                />
-                <LatestReadingCard 
-                  latest={latest} 
-                  colors={colors} 
+                <OverviewChartCard
+                  overviewSeries={overviewSeries}
+                  totalReadings={totalReadings}
+                  colors={colors}
                 />
               </>
             )}
@@ -273,7 +299,7 @@ export default function AnalyticsScreen() {
                 keyExtractor={item => item.id}
                 renderItem={({ item }) => (
                   <View style={[S.batchItemWrapper, { borderColor: colors.border, backgroundColor: selectedBatchId === item.id ? colors.primary + '15' : colors.card }]}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={[S.batchItemContent, { flex: 1 }]}
                       onPress={() => { setSelectedBatchId(item.id); setModalVisible(false); }}
                     >
@@ -282,11 +308,11 @@ export default function AnalyticsScreen() {
                         <Text style={[S.batchItemTitle, { color: colors.text }]}>{item.name || item.title}</Text>
                         <Text style={[S.batchItemDate, { color: colors.subtext }]}>{item.date || "Unknown date"}</Text>
                       </View>
-                      {selectedBatchId === item.id && <Ionicons name="checkmark-circle" size={24} color={colors.primary} style={{ marginRight: 8 }}/>}
+                      {selectedBatchId === item.id && <Ionicons name="checkmark-circle" size={24} color={colors.primary} style={{ marginRight: 8 }} />}
                     </TouchableOpacity>
-                    
+
                     {item.id !== 'batch-0' && (
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={S.deleteBtn}
                         onPress={() => handleDeleteBatch(item.id, item.name || item.title)}
                       >
@@ -297,7 +323,7 @@ export default function AnalyticsScreen() {
                 )}
                 contentContainerStyle={{ padding: 16 }}
                 ListFooterComponent={
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[S.addBatchBtn, { backgroundColor: colors.primary }]}
                     onPress={handleAddBatch}
                     disabled={isCreating}
@@ -317,25 +343,25 @@ export default function AnalyticsScreen() {
 }
 
 const S = StyleSheet.create({
-  header:     { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12 },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  iconBg:     { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  title:      { fontSize: 22, fontWeight: "800", letterSpacing: -0.5 },
-  sub:        { fontSize: 12, marginTop: 1, fontWeight: "700", textTransform: 'uppercase' },
-  center:     { flex: 1, justifyContent: "center", alignItems: "center", gap: 12, padding: 32 },
-  dim:        { fontSize: 14, fontWeight: "500" },
-  scroll:     { paddingHorizontal: 16, paddingBottom: 100 },
-  
+  iconBg: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: 22, fontWeight: "800", letterSpacing: -0.5 },
+  sub: { fontSize: 12, marginTop: 1, fontWeight: "700", textTransform: 'uppercase' },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12, padding: 32 },
+  dim: { fontSize: 14, fontWeight: "500" },
+  scroll: { paddingHorizontal: 16, paddingBottom: 100 },
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '80%', paddingBottom: 40 },
-  modalHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
-  modalTitle:   { fontSize: 20, fontWeight: '800' },
-  closeBtn:     { padding: 4 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
+  modalTitle: { fontSize: 20, fontWeight: '800' },
+  closeBtn: { padding: 4 },
   batchItemWrapper: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
   batchItemContent: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
   batchItemTitle: { fontSize: 16, fontWeight: '700' },
   batchItemDate: { fontSize: 12, marginTop: 2 },
-  deleteBtn:    { padding: 16, borderLeftWidth: 1, borderLeftColor: 'rgba(0,0,0,0.05)' },
-  addBatchBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16, borderRadius: 16, marginTop: 8 },
-  addBatchTxt:  { color: '#fff', fontSize: 16, fontWeight: '800' }
+  deleteBtn: { padding: 16, borderLeftWidth: 1, borderLeftColor: 'rgba(0,0,0,0.05)' },
+  addBatchBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 16, borderRadius: 16, marginTop: 8 },
+  addBatchTxt: { color: '#fff', fontSize: 16, fontWeight: '800' }
 });
