@@ -1,469 +1,255 @@
-import React, { useState, useRef, useEffect } from "react";
+/**
+ * App.js — Root entry point with premium floating tab bar.
+ */
+import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Animated,
-  Alert,
-  BackHandler,
-  Image,
-  StatusBar,
-  Dimensions,
-  Platform,
-  LogBox,
-} from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  NavigationContainer,
-  DefaultTheme,
-  DarkTheme,
-  useNavigation,
-} from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Ionicons } from "@expo/vector-icons";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { ThemeProvider, useAppTheme } from "./context/ThemeContext";
-import { useFonts } from "expo-font";
-import { logEnvironmentInfo, logProductionError } from './utils/debugUtils';
-import { initializeAuth } from './utils/authUtils';
+  View, Text, TouchableOpacity, StyleSheet,
+  ActivityIndicator, StatusBar, LogBox, Platform,
+} from 'react-native';
+import { useFonts } from 'expo-font';
+import AsyncStorage                   from '@react-native-async-storage/async-storage';
+import { NavigationContainer }        from '@react-navigation/native';
+import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { GestureHandlerRootView }     from 'react-native-gesture-handler';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons }                   from '@expo/vector-icons';
+import { LinearGradient }             from 'expo-linear-gradient';
 
-// Log environment info at app startup
-logEnvironmentInfo();
+import { ThemeProvider, useAppTheme } from './context/ThemeContext';
 
-// Initialize Firebase authentication early
-initializeAuth().catch(error => {
-  console.error('❌ Failed to initialize Firebase auth:', error);
-});
-
-// Handle global errors
-if (!__DEV__) {
-  const defaultErrorHandler = ErrorUtils.getGlobalHandler();
-  ErrorUtils.setGlobalHandler((error, isFatal) => {
-    logProductionError(error, isFatal ? 'FATAL' : 'NON-FATAL');
-    defaultErrorHandler(error, isFatal);
-  });
-}
+// ── Screens ───────────────────────────────────────────────────────────────────
+import MonitoringScreen          from './screens/MonitoringScreen';
+import AnalyticsScreen           from './screens/AnalyticsScreen';
+import TimelineScreen            from './screens/TimelineScreen';
+import NotificationScreen        from './screens/NotificationScreen';
+import OnboardingScreen          from './screens/OnboardingScreen';
+import BatchDetail               from './screens/Details/BatchDetail';
+import GraphDetail               from './screens/Details/GraphDetail';
+import ImageDetail               from './screens/Details/ImageDetail';
+import FermentationHistoryScreen from './screens/FermentationHistoryScreen';
 
 LogBox.ignoreLogs([
-    "SafeAreaView has been deprecated",
-    "Production Error Debug",
-    "Firebase",
-    "DATABASE_INTERNAL_ERROR"
-  ]);
-// Screens
-import OnboardingScreen from "./screens/OnboardingScreen";
-import MonitoringScreen from "./screens/MonitoringScreen";
-import TimelineScreen from "./screens/TimelineScreen";
-import BatchScreen from "./screens/BatchScreen";
-import GraphDetail from "./screens/Details/GraphDetail";
-import ImageDetail from "./screens/Details/ImageDetail";
-import BatchDetail from "./screens/Details/BatchDetail";
-import NotificationScreen from "./screens/NotificationScreen";
-import AboutScreen from "./screens/Menu/AboutScreen";
-import StagesScreen from "./screens/Menu/StagesScreen";
-import FunctionsScreen from "./screens/Menu/FunctionsScreen";
-import SoftwareScreen from "./screens/Menu/SoftwareScreen";
-import SettingsScreen from "./screens/Menu/SettingsScreen";
-import AddButton from "./screens/AddButton";
-import FermentationHistoryScreen from "./screens/FermentationHistoryScreen";
+  'Non-serializable values were found in the navigation state',
+  'Sending `onAnimatedValueUpdate`',
+]);
 
-function AddScreen() {
-  return <AddButton />; 
-}
-
-const Tab = createBottomTabNavigator();
+const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
-const { width, height } = Dimensions.get("window");
 
+// ── Tab config ────────────────────────────────────────────────────────────────
+const TABS = [
+  { name: 'Monitoring',    icon: 'home',          label: 'Home'      },
+  { name: 'Timeline',      icon: 'images',        label: 'Timeline'  },
+  { name: 'Analytics',     icon: 'analytics',     label: 'Analytics' },
+  { name: 'Notifications', icon: 'notifications', label: 'Alerts'    },
+];
 
-function ThemeStatusBar() {
-  const { isDark, colors } = useAppTheme();
-  return (
-    <StatusBar
-      backgroundColor={colors.primary}
-      barStyle={isDark ? "light-content" : "dark-content"}
-      translucent={false}
-    />
-  );
-}
-
-// App Header
-// App Header - Memoized to prevent re-renders
-const AppHeader = React.memo(({ navigation }) => {
-  const { colors } = useAppTheme();
-  const [menuVisible, setMenuVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(280)).current;
-
-  const toggleMenu = () => {
-    if (menuVisible) {
-      Animated.timing(slideAnim, {
-        toValue: 280,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => setMenuVisible(false));
-    } else {
-      setMenuVisible(true);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
-
-  const confirmExit = () => {
-    Alert.alert(
-      "Exit App",
-      "Are you really sure you want to exit?",
-      [
-        { text: "No", style: "cancel" },
-        { text: "Yes", onPress: () => BackHandler.exitApp() },
-      ],
-      { cancelable: true }
-    );
-  };
-
-  const sidebarItems = [
-    { icon: "information-circle-outline", label: "About", route: "About" },
-    { icon: "leaf-outline", label: "Stages", route: "Stages" },
-    { icon: "list-circle-outline", label: "Functions", route: "Functions" },
-    { icon: "laptop-outline", label: "Software", route: "Software" },
-    { icon: "settings-outline", label: "Settings", route: "Settings" },
-  ];
+// ── Premium Custom Tab Bar ────────────────────────────────────────────────────
+function CustomTabBar({ state, descriptors, navigation }) {
+  const { colors, isDark } = useAppTheme();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.headerContainer, { backgroundColor: colors.primary }]}>
-      <Text style={styles.title}>CacaoTrack</Text>
-      <TouchableOpacity onPress={toggleMenu} style={styles.menuButton}>
-        <Ionicons name="menu" size={24} color="#fff" />
-      </TouchableOpacity>
+    <View style={[
+      tabStyles.wrapper,
+      { paddingBottom: insets.bottom + 8, backgroundColor: colors.tabBar }
+    ]}>
+      {/* Top border accent line */}
+      <View style={[tabStyles.topBorder, { backgroundColor: colors.border }]} />
 
-      {/* Sidebar Drawer */}
-      <Modal transparent visible={menuVisible} animationType="none">
-        <Pressable
-          style={[styles.overlay, { backgroundColor: "rgba(0,0,0,0.4)" }]}
-          onPress={toggleMenu}
-        >
-          <Animated.View
-            style={[
-              styles.sidebar,
-              {
-                backgroundColor: colors.primary,
-                transform: [{ translateX: slideAnim }],
-              },
-            ]}
-          >
-            <View style={styles.menuHeader}>
-              <Image
-                source={require("./assets/cacaotrack_transparent.png")}
-                style={styles.menuLogo}
-                resizeMode="contain"
-              />
-            </View>
+      <View style={tabStyles.row}>
+        {state.routes.map((route, index) => {
+          const tab     = TABS[index];
+          const focused = state.index === index;
 
-            <View style={styles.menuList}>
-              {sidebarItems.map((item) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[styles.menuRow, { backgroundColor: colors.primary }]}
-                  onPress={() => {
-                    toggleMenu();
-                    if (item.route) navigation.navigate(item.route);
-                  }}
-                >
-                  <Ionicons
-                    name={item.icon}
-                    size={20}
-                    color="#fff"
-                    style={{ width: 26 }}
-                  />
-                  <Text style={[styles.menuLabel, { color: "#fff" }]}>
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          const onPress = () => {
+            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+          };
 
-            {/* Exit button */}
+          return (
             <TouchableOpacity
-              style={[styles.exitRow, { backgroundColor: colors.primary }]}
-              onPress={confirmExit}
+              key={route.key}
+              onPress={onPress}
+              activeOpacity={0.7}
+              style={tabStyles.tab}
             >
-              <Ionicons
-                name="exit-outline"
-                size={20}
-                color="#fff"
-                style={{ width: 26 }}
-              />
-              <Text style={[styles.menuLabel, { color: "#fff" }]}>Exit</Text>
+              {/* Active pill background */}
+              {focused && (
+                <LinearGradient
+                  colors={[colors.primary + '30', colors.primary + '10']}
+                  style={tabStyles.activePill}
+                />
+              )}
+
+              {/* Icon */}
+              <View style={[
+                tabStyles.iconWrap,
+                focused && { backgroundColor: colors.primary + '20' },
+              ]}>
+                <Ionicons
+                  name={focused ? tab.icon : `${tab.icon}-outline`}
+                  size={22}
+                  color={focused ? colors.primary : colors.subtext}
+                />
+              </View>
+
+              {/* Label */}
+              <Text style={[
+                tabStyles.label,
+                { color: focused ? colors.primary : colors.subtext },
+                focused && { fontWeight: '700' },
+              ]}>
+                {tab.label}
+              </Text>
             </TouchableOpacity>
-          </Animated.View>
-        </Pressable>
-      </Modal>
+          );
+        })}
+      </View>
     </View>
   );
+}
+
+const tabStyles = StyleSheet.create({
+  wrapper: {
+    borderTopWidth: 0,
+    elevation: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+  },
+  topBorder: {
+    height: 1,
+    width: '100%',
+    opacity: 0.4,
+  },
+  row: {
+    flexDirection: 'row',
+    paddingTop: 10,
+    paddingHorizontal: 8,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+    position: 'relative',
+  },
+  activePill: {
+    position:     'absolute',
+    top:          -4,
+    left:         8,
+    right:        8,
+    bottom:       -4,
+    borderRadius: 16,
+  },
+  iconWrap: {
+    width:         40,
+    height:        40,
+    borderRadius:  20,
+    alignItems:    'center',
+    justifyContent:'center',
+    marginBottom:   2,
+  },
+  label: {
+    fontSize:    10,
+    fontWeight:  '600',
+    letterSpacing: 0.3,
+    marginTop:   2,
+  },
 });
 
-// Helper to render header title correctly
-const HeaderTitle = ({ navigation }) => <AppHeader navigation={navigation} />;
-
-// Monitor Stack
-function MonitorStack({ navigation }) {
-  const { colors } = useAppTheme();
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.primary },
-        headerTintColor: "#fff",
-        headerTitle: (props) => <HeaderTitle {...props} navigation={navigation} />,
-      }}
-    >
-      <Stack.Screen name="Monitoring" component={MonitoringScreen} />
-      <Stack.Screen name="GraphDetail" component={GraphDetail} />
-      <Stack.Screen
-        name="FermentationHistory"
-        component={FermentationHistoryScreen}
-        options={{ headerShown: false }}
-      />
-    </Stack.Navigator>
-  );
-}
-
-// Timeline Stack
-function TimelineStack({ navigation }) {
-  const { colors } = useAppTheme();
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.primary },
-        headerTintColor: "#fff",
-        headerTitle: (props) => <HeaderTitle {...props} navigation={navigation} />,
-      }}
-    >
-      <Stack.Screen name="TimelineMain" component={TimelineScreen} />
-      <Stack.Screen name="ImageDetail" component={ImageDetail} />
-    </Stack.Navigator>
-  );
-}
-
-// Batch Stack
-function BatchStack({ navigation }) {
-  const { colors } = useAppTheme();
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.primary },
-        headerTintColor: "#fff",
-        headerTitle: (props) => <HeaderTitle {...props} navigation={navigation} />,
-      }}
-    >
-      <Stack.Screen name="BatchMain" component={BatchScreen} />
-      <Stack.Screen name="BatchDetail" component={BatchDetail} />
-    </Stack.Navigator>
-  );
-}
-
-// Notification Stack
-function NotificationStack({ navigation }) {
-  const { colors } = useAppTheme();
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.primary },
-        headerTintColor: "#fff",
-        headerTitle: (props) => <HeaderTitle {...props} navigation={navigation} />,
-      }}
-    >
-      <Stack.Screen name="NotificationMain" component={NotificationScreen} />
-    </Stack.Navigator>
-  );
-}
-
-// Tabs (Integrating AddButton)
+// ── Bottom Tab Navigator ──────────────────────────────────────────────────────
 function MainTabs() {
-  const { colors } = useAppTheme();
-  const navigation = useNavigation();
-  
   return (
     <Tab.Navigator
-      screenOptions={({ route, navigation }) => ({
-        headerShown: false,
-        tabBarStyle: [
-          styles.tabBar,
-          {
-            backgroundColor: colors.primary,
-            borderTopLeftRadius: 25,
-            borderTopRightRadius: 25,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 4,
-            paddingBottom: Platform.OS === "ios" ? 6 : 2,
-            height: 60,
-          },
-        ],
-        tabBarActiveTintColor: "#fff",
-        tabBarInactiveTintColor: "rgba(255,255,255,0.6)",
-        tabBarShowLabel: false,
-        tabBarIcon: ({ color, focused }) => {
-          let iconName;
-          if (route.name === "Monitor") iconName = "stats-chart-outline";
-          else if (route.name === "Timeline") iconName = "images-outline";
-          else if (route.name === "Add")
-            return <AddButton onPress={() => navigation.navigate("Add")} />;
-          else if (route.name === "Batch") iconName = "layers-outline";
-          else if (route.name === "Notification")
-            iconName = "notifications-outline";
-          return (
-            <Ionicons name={iconName} size={focused ? 24 : 22} color={color} />
-          );
-        },
-      })}
+      tabBar={props => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Monitor" component={MonitorStack} />
-      <Tab.Screen name="Timeline" component={TimelineStack} />
-      <Tab.Screen name="Add" component={AddButton} />
-      <Tab.Screen name="Batch" component={BatchStack} />
-      <Tab.Screen name="Notification" component={NotificationStack} />
+      {TABS.map(tab => (
+        <Tab.Screen
+          key={tab.name}
+          name={tab.name}
+          component={
+            tab.name === 'Monitoring'    ? MonitoringScreen   :
+            tab.name === 'Timeline'      ? TimelineScreen     :
+            tab.name === 'Analytics'     ? AnalyticsScreen    :
+            NotificationScreen
+          }
+        />
+      ))}
     </Tab.Navigator>
   );
 }
 
-// Root Stack
-function RootNavigator() {
+// ── Root Stack ────────────────────────────────────────────────────────────────
+function RootStack({ initialRoute }) {
   return (
-    <Stack.Navigator initialRouteName="Onboarding">
-      <Stack.Screen
-        name="Onboarding"
-        component={OnboardingScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="MainTabs"
-        component={MainTabs}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen name="About" component={AboutScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Stages" component={StagesScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Functions" component={FunctionsScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Software" component={SoftwareScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+    <Stack.Navigator
+      initialRouteName={initialRoute}
+      screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}
+    >
+      <Stack.Screen name="Onboarding"          component={OnboardingScreen}          />
+      <Stack.Screen name="MainTabs"            component={MainTabs}                  />
+      <Stack.Screen name="BatchDetail"         component={BatchDetail}               />
+      <Stack.Screen name="GraphDetail"         component={GraphDetail}               />
+      <Stack.Screen name="ImageDetail"         component={ImageDetail}               />
+      <Stack.Screen name="FermentationHistory" component={FermentationHistoryScreen} />
     </Stack.Navigator>
   );
 }
 
-// Styles
-const styles = StyleSheet.create({
-  addContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f0f0f0",
-  },
-  addText: {
-    fontSize: 18,
-    color: "#333",
-  },
-  headerContainer: {
-    height: 56,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 0,
-  },
-  title: {
-    fontSize: 33,
-    color: "#fff",
-    fontFamily: "Billabong",
-  },
-  menuButton: { padding: 0 },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.25)",
-    flexDirection: "row",
-    justifyContent: "flex-end",
-  },
-  sidebar: {
-    width: 240,
-    paddingTop: 80,
-    paddingHorizontal: 20,
-    height: "100%",
-    elevation: 8,
-    justifyContent: "space-between",
-  },
-  menuHeader: {
-    alignItems: "center",
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.3)",
-    marginBottom: 10,
-  },
-  menuLogo: { width: 100, height: 100 },
-  menuList: { flex: 1 },
-  menuRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
-  exitRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.3)",
-  },
-  menuLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#fff",
-    marginLeft: 12,
-  },
-  tabBar: {
-    position: "absolute",
-    borderTopWidth: 0,
-    paddingHorizontal: 15,
-    paddingTop: 6,
-  },
-});
-
-// Main App
-export default function App() {
+// ── App Shell ─────────────────────────────────────────────────────────────────
+function AppShell() {
+  const [initialRoute, setInitialRoute] = useState(null);
+  const { colors, isDark } = useAppTheme();
   const [fontsLoaded] = useFonts({
-    Billabong: require("./assets/fonts/Billabong.otf"),
+    Billabong: require('./assets/fonts/Billabong.otf'),
   });
 
-  if (!fontsLoaded) return null;
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      // DEV: reset onboarding each launch for testing. Remove __DEV__ block before shipping.
+      if (__DEV__) {
+        await AsyncStorage.removeItem('onboardingComplete').catch(() => {});
+      }
+      const value = await AsyncStorage.getItem('onboardingComplete').catch(() => null);
+      setInitialRoute(value === 'true' ? 'MainTabs' : 'Onboarding');
+    };
+    checkOnboarding();
+  }, []);
+
+  if (!initialRoute || !fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
-    <ThemeProvider>
-      <ThemeConsumerApp />
-    </ThemeProvider>
+    <NavigationContainer>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.background}
+        translucent={false}
+      />
+      <RootStack initialRoute={initialRoute} />
+    </NavigationContainer>
   );
 }
 
-// Wrap NavigationContainer with theme and SafeAreaProvider
-function ThemeConsumerApp() {
-  const { isDark, colors } = useAppTheme();
-
+// ── Root Export ───────────────────────────────────────────────────────────────
+export default function App() {
   return (
-    <SafeAreaProvider>
-      <NavigationContainer
-        theme={{
-          ...(isDark ? DarkTheme : DefaultTheme),
-          colors: {
-            ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
-            background: colors.background,
-            card: colors.card,
-            text: colors.text,
-            border: colors.border,
-            primary: colors.primary,
-          },
-        }}
-      >
-        <ThemeStatusBar />
-        <RootNavigator />
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <AppShell />
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

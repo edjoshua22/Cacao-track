@@ -38,6 +38,10 @@
     "plugins": [
       "expo-font"
     ],
+    "experiments": {
+      "typedRoutes": false,
+      "router": false
+    },
     "extra": {
       "eas": {
         "projectId": "654c66d6-308d-4141-95f4-eb7f8aa6fb47"

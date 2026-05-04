@@ -1,5 +1,5 @@
 import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { auth } from '../firebaseConfig.secure';
 
 let currentUser = null;
 let authPromise = null;

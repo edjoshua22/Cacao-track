@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
+  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -19,14 +20,15 @@ import LineChart from "../components/LineChart";
 import Background from "../components/Background";
 import { theme } from "../theme";
 import { useAppTheme } from "../context/ThemeContext";
-import { app } from "../firebaseConfig";
+import { app } from "../firebaseConfig.secure";
 
 const { width } = Dimensions.get('window');
 
-const db = getDatabase(app);
+const getDb = () => getDatabase(app);
 
 export default function MonitoringScreen() {
-  const { colors, isDark } = useAppTheme();
+  const { colors, isDark, toggleTheme } = useAppTheme();
+  const navigation         = useNavigation();
 
   // Grouped sensor values for better performance
   const [sensors, setSensors] = useState({
@@ -82,9 +84,9 @@ export default function MonitoringScreen() {
 
     // --- SINGLE listener on the sensors parent node to avoid 3x re-renders ---
     // Read all sensor nodes in one shot using a single ref
-    const dht1Ref = ref(db, 'DHT1');
-    const dht2Ref = ref(db, 'DHT2');
-    const averageRef = ref(db, 'Average');
+    const dht1Ref = ref(getDb(), 'DHT1');
+    const dht2Ref = ref(getDb(), 'DHT2');
+    const averageRef = ref(getDb(), 'Average');
 
     const processNode = (nodeKey, data, now) => {
       if (!data) return null;
@@ -153,7 +155,7 @@ export default function MonitoringScreen() {
     listeners.push(averageUnsubscribe);
 
     // History for chart - read from sensorData with limit
-    const sensorRef = query(ref(db, 'sensorData'), limitToLast(20));
+    const sensorRef = query(ref(getDb(), 'sensorData'), limitToLast(20));
     const sensorUnsubscribe = onValue(sensorRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
@@ -182,22 +184,51 @@ export default function MonitoringScreen() {
 
   return (
     <Background variant="waves">
-      <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
         <ScrollView
           style={styles.container}
-          contentContainerStyle={{ paddingBottom: 20 }}
+          contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
         >
+          {/* ── Premium App Header ── */}
+          <View style={styles.appHeader}>
+            <View style={styles.appHeaderLeft}>
+              {/* Logo */}
+              <Image
+                source={require('../assets/cacaotrack_transparent.png')}
+                style={styles.logoImg}
+                resizeMode="contain"
+              />
+              <View>
+                <Text style={[styles.appTitle, { color: colors.primary, fontFamily: 'Billabong' }]}>CacaoTrack</Text>
+                <Text style={[styles.appSubtitle, { color: colors.subtext }]}>Live Monitoring</Text>
+              </View>
+            </View>
+            <View style={styles.appHeaderRight}>
+              <TouchableOpacity
+                style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={toggleTheme}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isDark ? 'sunny-outline' : 'moon-outline'}
+                  size={18}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Featured Hero Card */}
           <LinearGradient
-            colors={isDark ? ['#8B5A2B', '#6B4423'] : ['#FDB95D', '#F59E0B']}
+            colors={isDark ? ['#C4772A', '#8B5A2B'] : ['#E8A44A', '#C4772A']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.heroCard}
           >
             {/* Decorative elements */}
-            <View style={[styles.heroDeco1, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.2)' }]} />
-            <View style={[styles.heroDeco2, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.15)' }]} />
+            <View style={[styles.heroDeco1, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
+            <View style={[styles.heroDeco2, { backgroundColor: 'rgba(255,255,255,0.06)' }]} />
             
             <View style={styles.heroHeader}>
               <View>
@@ -521,28 +552,6 @@ export default function MonitoringScreen() {
             <View style={[styles.chartAccentLine, { backgroundColor: '#A78BFA' }]} />
           </LinearGradient>
 
-          {/* ── Fermentation History Button ── */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('FermentationHistory')}
-            style={styles.historyBtn}
-          >
-            <LinearGradient
-              colors={['#8B5A2B', '#A0522D']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.historyBtnGradient}
-            >
-              <View style={styles.historyBtnIconWrap}>
-                <Ionicons name="leaf" size={22} color="rgba(255,255,255,0.9)" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.historyBtnTitle}>Fermentation History</Text>
-                <Text style={styles.historyBtnSub}>View Day 0–6 stage charts per batch</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.8)" />
-            </LinearGradient>
-          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     </Background>
@@ -552,20 +561,69 @@ export default function MonitoringScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1,
-    paddingTop: 12,
+    paddingTop: 4,
     paddingHorizontal: 16,
+  },
+  // ── App Header ─────────────────────────────────────────────────────────────
+  appHeader: {
+    flexDirection:   'row',
+    justifyContent:  'space-between',
+    alignItems:      'center',
+    paddingVertical:  16,
+    paddingHorizontal: 4,
+    marginBottom:     8,
+  },
+  appHeaderLeft: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           10,
+  },
+  appHeaderRight: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           8,
+  },
+  onlineDot: {
+    width:        10,
+    height:       10,
+    borderRadius:  5,
+    marginRight:   4,
+    shadowColor:  '#34D399',
+    shadowOpacity: 0.8,
+    shadowRadius:  6,
+    elevation:     3,
+  },
+  appTitle: {
+    fontSize:      36,
+    letterSpacing:  0.5,
+    lineHeight:    40,
+  },
+  logoImg: {
+    width:  44,
+    height: 44,
+    borderRadius: 12,
+  },
+  appSubtitle: {
+    fontSize:   12,
+    marginTop:   1,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  headerBtn: {
+    width:        38,
+    height:       38,
+    borderRadius: 19,
+    borderWidth:   1,
+    alignItems:   'center',
+    justifyContent:'center',
   },
   historyBtn: {
     borderRadius: 16,
     overflow: 'hidden',
     marginTop: 24,
     marginBottom: 8,
-    shadowColor: '#8B5A2B',
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
   },
+  // Tip card styles removed
   historyBtnGradient: {
     flexDirection: 'row',
     alignItems: 'center',

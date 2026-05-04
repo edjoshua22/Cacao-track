@@ -1,115 +1,110 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, ActivityIndicator } from 'react-native';
-import { useAppTheme } from '../../context/ThemeContext'; // Adjust if needed
+/**
+ * ImageDetail.js
+ * Shows a full-screen detail view for a single timeline capture image.
+ * Cleaned up: extracted sub-components, shared styles, named export.
+ */
+import React, { useState, useCallback } from 'react';
+import { View, Text, Image, ActivityIndicator } from 'react-native';
+import { useAppTheme }            from '../../context/ThemeContext';
+import { detailStyles as styles } from './DetailStyles';
 
-// Map day keys to human-readable stage names
+// ── Constants ────────────────────────────────────────────────────────────────
 const DAY_NAMES = {
-  day0: "Fresh",
-  day1: "Anaerobic",
-  day2: "Anaerobic / Alcoholic",
-  day3: "Aerobic",
-  day4: "Aerobic",
-  day5: "Maturation",
-  day6: "Drying Ready",
+  day0: 'Fresh',
+  day1: 'Anaerobic',
+  day2: 'Anaerobic / Alcoholic',
+  day3: 'Aerobic',
+  day4: 'Aerobic',
+  day5: 'Maturation',
+  day6: 'Drying Ready',
 };
 
-// Robust timestamp parser
-const parseTimestamp = (timestampStr) => {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Parse a timestamp string "YYYY-MM-DD_HH-MM-SS" (or with colons) into a Date.
+ * @param {string} ts
+ * @returns {Date|null}
+ */
+const parseTimestamp = (ts) => {
   try {
-    const [datePart, timePart] = timestampStr.includes('_') ? timestampStr.split('_') : timestampStr.split(' ');
-    const [year, month, day] = datePart.split('-').map(Number);
+    const [datePart, timePart] = ts.includes('_') ? ts.split('_') : ts.split(' ');
+    const [year, month, day]   = datePart.split('-').map(Number);
     const [hour, minute, second] = timePart.split(/[-:]/).map(Number);
     return new Date(year, month - 1, day, hour, minute, second);
-  } catch (error) {
-    // Error parsing timestamp
+  } catch {
     return null;
   }
 };
 
-export default function ImageDetail({ route }) {
-  const { colors } = useAppTheme();
-  const { url, day, stage, confidence, timestamp } = route.params; // Updated keys to match TimelineScreen
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+// ── Sub-components ────────────────────────────────────────────────────────────
 
-  const parsedDate = parseTimestamp(timestamp);
+/**
+ * ImageViewer — shows the image with loading and error states.
+ */
+const ImageViewer = React.memo(({ url, colors }) => {
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(false);
+
+  const onLoadStart = useCallback(() => setLoading(true),  []);
+  const onLoadEnd   = useCallback(() => setLoading(false), []);
+  const onError     = useCallback(() => { setLoading(false); setError(true); }, []);
+
+  return (
+    <View style={[styles.imageContainer, { backgroundColor: colors?.placeholderBg || '#E5E7EB' }]}>
+      {loading && !error && (
+        <View style={[styles.loadingOverlay, { backgroundColor: colors?.overlayBg || 'rgba(0,0,0,0.5)' }]}>
+          <ActivityIndicator size="large" color={colors?.primary} />
+        </View>
+      )}
+      {error ? (
+        <View style={styles.errorOverlay}>
+          <Text style={[styles.errorText, { color: colors?.text }]}>Failed to load image</Text>
+        </View>
+      ) : (
+        <Image
+          source={{ uri: url }}
+          style={styles.image}
+          onLoadStart={onLoadStart}
+          onLoadEnd={onLoadEnd}
+          onError={onError}
+          resizeMode="contain"
+        />
+      )}
+    </View>
+  );
+});
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+/**
+ * ImageDetail — full detail view for a single cacao timeline image.
+ * Receives route params: url, day, stage, confidence, timestamp.
+ */
+const ImageDetail = ({ route }) => {
+  const { colors }                              = useAppTheme();
+  const { url, day, stage, confidence, timestamp } = route.params;
+
+  const parsedDate       = parseTimestamp(timestamp);
   const displayTimestamp = parsedDate ? parsedDate.toLocaleString() : timestamp;
-  
-  // Extract day number from day key (e.g., "day0" -> "0")
-  const dayNumber = day ? day.replace('day', '') : '';
-  const stageName = DAY_NAMES[day] || stage || 'Unknown';
-  const confidencePct = confidence ? Math.round(confidence * 100) : 0;
+  const dayNumber        = day ? day.replace('day', '') : '';
+  const stageName        = DAY_NAMES[day] || stage || 'Unknown';
+  const confidencePct    = confidence ? Math.round(confidence * 100) : 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors?.bg }]}>
-      <Text style={[styles.title, { color: colors?.text }]}>Image Detail</Text>
-      
-      <View style={[styles.imageContainer, { backgroundColor: colors?.placeholderBg || '#E5E7EB' }]}>
-        {loading && !error && (
-          <View style={[styles.loadingOverlay, { backgroundColor: colors?.overlayBg || 'rgba(0, 0, 0, 0.5)' }]}>
-            <ActivityIndicator size="large" color={colors?.primary} />
-          </View>
-        )}
-        {error ? (
-          <View style={styles.errorOverlay}>
-            <Text style={[styles.errorText, { color: colors?.text }]}>Failed to load image</Text>
-          </View>
-        ) : (
-          <Image
-            source={{ uri: url }}
-            style={styles.image}
-            onLoadStart={() => setLoading(true)}
-            onLoadEnd={() => setLoading(false)}
-            onError={() => {
-              setLoading(false);
-              setError(true);
-            }}
-            resizeMode="contain"
-          />
-        )}
-      </View>
+      <Text style={[styles.imageTitle, { color: colors?.text }]}>Image Detail</Text>
 
-      <Text style={[styles.caption, { color: colors?.text }]}>
-        Day {dayNumber} - {stageName} ({confidencePct}%)
+      <ImageViewer url={url} colors={colors} />
+
+      <Text style={[styles.caption,   { color: colors?.text }]}>
+        Day {dayNumber} — {stageName} ({confidencePct}%)
       </Text>
       <Text style={[styles.timestamp, { color: colors?.subtext }]}>
-        Timestamp: {displayTimestamp}
+        Captured: {displayTimestamp}
       </Text>
     </View>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  title: { fontSize: 22, fontWeight: '800', marginBottom: 12 },
-  imageContainer: {
-    height: 300,
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  image: { width: '100%', height: '100%' },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  errorOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: { fontSize: 16, fontWeight: '600' },
-  caption: { fontSize: 16, marginBottom: 8 },
-  timestamp: { fontSize: 14, opacity: 0.7 },
-});
+export default ImageDetail;

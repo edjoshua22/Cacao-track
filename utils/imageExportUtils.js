@@ -3,7 +3,7 @@ import * as Sharing from "expo-sharing";
 import * as Print from "expo-print";
 import { Alert } from "react-native";
 import { getDatabase, ref, get } from "firebase/database";
-import { app } from "../firebaseConfig";
+import { app } from "../firebaseConfig.secure";
 import { 
   safeParseTimestamp, 
   calculateFermentationDay,

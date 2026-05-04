@@ -136,13 +136,24 @@ function LineChart({
     ]).start();
   }, []);
 
-  const safeLabels = labels.length ? labels : ["0"];
-  // Use new data if provided, otherwise fallback to old format for backward compatibility
-  const safeTempDHT1 = tempDHT1Data.length ? tempDHT1Data : (tempData.length ? tempData : [0]);
-  const safeTempDHT2 = tempDHT2Data.length ? tempDHT2Data : [0];
-  const safeHumidDHT1 = humidDHT1Data.length ? humidDHT1Data : (humidData.length ? humidData : [0]);
-  const safeHumidDHT2 = humidDHT2Data.length ? humidDHT2Data : [0];
-  const safeMoisture = moistureData.length ? moistureData : [0];
+  // Performance optimization: limit points drawn to prevent SVG rendering from freezing the UI
+  const MAX_POINTS = 50;
+  const downsample = (arr, max) => {
+    if (!arr || arr.length <= max) return arr;
+    const step = (arr.length - 1) / (max - 1);
+    const result = [];
+    for (let i = 0; i < max; i++) {
+      result.push(arr[Math.min(Math.floor(i * step), arr.length - 1)]);
+    }
+    return result;
+  };
+
+  const safeLabels = downsample(labels.length ? labels : ["0"], MAX_POINTS);
+  const safeTempDHT1 = downsample(tempDHT1Data.length ? tempDHT1Data : (tempData.length ? tempData : [0]), MAX_POINTS);
+  const safeTempDHT2 = downsample(tempDHT2Data.length ? tempDHT2Data : [0], MAX_POINTS);
+  const safeHumidDHT1 = downsample(humidDHT1Data.length ? humidDHT1Data : (humidData.length ? humidData : [0]), MAX_POINTS);
+  const safeHumidDHT2 = downsample(humidDHT2Data.length ? humidDHT2Data : [0], MAX_POINTS);
+  const safeMoisture = downsample(moistureData.length ? moistureData : [0], MAX_POINTS);
 
   const toggleDataset = (key) => setActiveDatasets(prev => ({ ...prev, [key]: !prev[key] }));
 

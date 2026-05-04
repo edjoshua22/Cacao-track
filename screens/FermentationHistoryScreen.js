@@ -13,14 +13,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ref, get, getDatabase } from 'firebase/database';
+import { app } from '../firebaseConfig.secure';
 import { useNavigation } from '@react-navigation/native';
 import LineChart from '../components/LineChart';
 import Background from '../components/Background';
 import { useAppTheme } from '../context/ThemeContext';
-import { app } from '../firebaseConfig';
 import { initializeAuth, getUserId } from '../utils/authUtils';
 
-const db = getDatabase(app);
+// Lazy getter — safe even if app isn't initialized at module parse time
+const getDb = () => getDatabase(app);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const STAGES = [
@@ -208,7 +209,7 @@ export default function FermentationHistoryScreen() {
         const userId = getUserId();
         if (!userId) { setLoadingBatches(false); return; }
 
-        const snap = await get(ref(db, 'batches/' + userId));
+        const snap = await get(ref(getDb(), 'batches/' + userId));
         if (cancelled) return;
 
         if (!snap.exists()) { setBatches([]); setLoadingBatches(false); return; }
