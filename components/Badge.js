@@ -9,7 +9,7 @@ const IDEAL_TEMP_MAX = 50;
 const IDEAL_HUM_MIN = 65;
 const IDEAL_HUM_MAX = 80;
 
-export default function Badge({ type = "temperature", value, humidity }) {
+function Badge({ type = "temperature", value, humidity }) {
   const { isDark } = useAppTheme();
   let label = "Optimal";
   let tone = "success";
@@ -65,6 +65,8 @@ export default function Badge({ type = "temperature", value, humidity }) {
     </View>
   );
 }
+
+export default React.memo(Badge);
 
 const styles = StyleSheet.create({
   badge: {

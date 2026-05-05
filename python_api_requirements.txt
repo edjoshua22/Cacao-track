@@ -1,0 +1,24 @@
+# Web Framework & API
+flask==3.0.0
+flask-cors==4.0.0
+
+# Data Processing & Science
+requests==2.31.0
+Pillow==10.1.0
+numpy==1.24.3
+pandas==2.1.0
+matplotlib==3.8.0
+
+# Deep Learning
+tensorflow==2.15.0
+
+# Alternative: use PyTorch instead
+# torch==2.1.0
+# torchvision==0.16.0
+
+# Model Evaluation
+scikit-learn==1.3.0
+
+# Development & Utilities
+python-dotenv==1.0.0
+

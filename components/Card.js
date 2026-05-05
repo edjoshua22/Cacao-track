@@ -3,10 +3,12 @@ import { View, StyleSheet } from 'react-native';
 import { theme } from '../theme';
 import { useAppTheme } from '../context/ThemeContext';
 
-export default function Card({ style, children }) {
+function Card({ style, children }) {
   const { colors } = useAppTheme();
   return <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, style]}>{children}</View>;
 }
+
+export default React.memo(Card);
 
 const styles = StyleSheet.create({
   card: {

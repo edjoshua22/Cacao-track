@@ -1,0 +1,49 @@
+diff --git a/node_modules/awilix/lib/awilix.browser.mjs b/node_modules/awilix/lib/awilix.browser.mjs
+index ce3202d..9f99e0b 100644
+--- a/node_modules/awilix/lib/awilix.browser.mjs
++++ b/node_modules/awilix/lib/awilix.browser.mjs
+@@ -521,9 +521,8 @@ function requireLoadModuleNative () {
+ 	if (hasRequiredLoadModuleNative) return loadModuleNative;
+ 	hasRequiredLoadModuleNative = 1;
+ 	// This is kept in a separate .js file to prevent TypeScript re-writing the import() statement to a require() statement
+-	// This is the CJS version; the .mjs version is used by the ESM build.
+ 	loadModuleNative.importModule = function importModule(path) {
+-	  return import(path)
++	  return Promise.reject(new Error("Dynamic import not supported in React Native Metro"));
+ 	};
+ 	return loadModuleNative;
+ }
+diff --git a/node_modules/awilix/lib/awilix.umd.js b/node_modules/awilix/lib/awilix.umd.js
+index 0554a45..dcba63a 100644
+--- a/node_modules/awilix/lib/awilix.umd.js
++++ b/node_modules/awilix/lib/awilix.umd.js
+@@ -529,7 +529,7 @@
+   	// This is kept in a separate .js file to prevent TypeScript re-writing the import() statement to a require() statement
+   	// This is the CJS version; the .mjs version is used by the ESM build.
+   	loadModuleNative.importModule = function importModule(path) {
+-  	  return import(path)
++  	  return Promise.reject(new Error("Dynamic import not supported in React Native Metro"));
+   	};
+   	return loadModuleNative;
+   }
+diff --git a/node_modules/awilix/lib/load-module-native.js b/node_modules/awilix/lib/load-module-native.js
+index 0836e4a..169ede7 100644
+--- a/node_modules/awilix/lib/load-module-native.js
++++ b/node_modules/awilix/lib/load-module-native.js
+@@ -1,5 +1,5 @@
+ // This is kept in a separate .js file to prevent TypeScript re-writing the import() statement to a require() statement
+ // This is the CJS version; the .mjs version is used by the ESM build.
+ module.exports.importModule = function importModule(path) {
+-  return import(path)
++  return Promise.reject(new Error("Dynamic import not supported in React Native Metro"));
+ }
+diff --git a/node_modules/awilix/lib/load-module-native.mjs b/node_modules/awilix/lib/load-module-native.mjs
+index 7d93373..9eafe37 100644
+--- a/node_modules/awilix/lib/load-module-native.mjs
++++ b/node_modules/awilix/lib/load-module-native.mjs
+@@ -1,4 +1,4 @@
+ // This is kept in a separate .js file to prevent TypeScript re-writing the import() statement to a require() statement
+ export function importModule(path) {
+-  return import(path)
++  return Promise.reject(new Error("Dynamic import not supported in React Native Metro"));
+ }

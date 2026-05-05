@@ -106,7 +106,7 @@ function EnhancedTooltip({ tooltip, isDark, screenW }) {
   );
 }
 
-export default function LineChart({ 
+function LineChart({ 
   labels = [], 
   tempData = [], 
   tempDHT1Data = [],
@@ -114,7 +114,8 @@ export default function LineChart({
   humidData = [],
   humidDHT1Data = [],
   humidDHT2Data = [],
-  moistureData = [] 
+  moistureData = [],
+  hideHeader = false
 }) {
   const { colors, isDark } = useAppTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -135,13 +136,24 @@ export default function LineChart({
     ]).start();
   }, []);
 
-  const safeLabels = labels.length ? labels : ["0"];
-  // Use new data if provided, otherwise fallback to old format for backward compatibility
-  const safeTempDHT1 = tempDHT1Data.length ? tempDHT1Data : (tempData.length ? tempData : [0]);
-  const safeTempDHT2 = tempDHT2Data.length ? tempDHT2Data : [0];
-  const safeHumidDHT1 = humidDHT1Data.length ? humidDHT1Data : (humidData.length ? humidData : [0]);
-  const safeHumidDHT2 = humidDHT2Data.length ? humidDHT2Data : [0];
-  const safeMoisture = moistureData.length ? moistureData : [0];
+  // Performance optimization: limit points drawn to prevent SVG rendering from freezing the UI
+  const MAX_POINTS = 50;
+  const downsample = (arr, max) => {
+    if (!arr || arr.length <= max) return arr;
+    const step = (arr.length - 1) / (max - 1);
+    const result = [];
+    for (let i = 0; i < max; i++) {
+      result.push(arr[Math.min(Math.floor(i * step), arr.length - 1)]);
+    }
+    return result;
+  };
+
+  const safeLabels = downsample(labels.length ? labels : ["0"], MAX_POINTS);
+  const safeTempDHT1 = downsample(tempDHT1Data.length ? tempDHT1Data : (tempData.length ? tempData : [0]), MAX_POINTS);
+  const safeTempDHT2 = downsample(tempDHT2Data.length ? tempDHT2Data : [0], MAX_POINTS);
+  const safeHumidDHT1 = downsample(humidDHT1Data.length ? humidDHT1Data : (humidData.length ? humidData : [0]), MAX_POINTS);
+  const safeHumidDHT2 = downsample(humidDHT2Data.length ? humidDHT2Data : [0], MAX_POINTS);
+  const safeMoisture = downsample(moistureData.length ? moistureData : [0], MAX_POINTS);
 
   const toggleDataset = (key) => setActiveDatasets(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -214,15 +226,17 @@ export default function LineChart({
 
   return (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }], width: "100%", alignItems: "center", paddingVertical: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, paddingHorizontal: 20 }}>
-        <LinearGradient colors={isDark ? ['#3E2723', '#5D4037'] : ['#8C6339', '#A0522D']} style={{ width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
-          <Ionicons name="pulse-outline" size={20} color="#ffffff" />
-        </LinearGradient>
-        <View>
-          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>📊 Live Sensor Data</Text>
-          <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 2 }}>Real-time fermentation metrics</Text>
+      {!hideHeader && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, paddingHorizontal: 20 }}>
+          <LinearGradient colors={isDark ? ['#3E2723', '#5D4037'] : ['#8C6339', '#A0522D']} style={{ width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+            <Ionicons name="pulse-outline" size={20} color="#ffffff" />
+          </LinearGradient>
+          <View>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>📊 Live Sensor Data</Text>
+            <Text style={{ fontSize: 12, color: colors.subtext, marginTop: 2 }}>Real-time fermentation metrics</Text>
+          </View>
         </View>
-      </View>
+      )}
 
       <CoolLegend onToggle={toggleDataset} activeDatasets={activeDatasets} isDark={isDark} />
 
@@ -235,7 +249,7 @@ export default function LineChart({
           height={chartHeight}
           withDots={datasets.length > 0}  // Only show dots if datasets exist
           withShadow={false}
-          bezier
+          bezier={safeLabels.length >= 3}
           segments={6}
           fromZero={false}
           yAxisSuffix=""
@@ -283,3 +297,5 @@ export default function LineChart({
     </Animated.View>
   );
 }
+
+export default React.memo(LineChart);
