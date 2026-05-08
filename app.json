@@ -39,8 +39,7 @@
       "expo-font"
     ],
     "experiments": {
-      "typedRoutes": false,
-      "router": false
+      "typedRoutes": false
     },
     "extra": {
       "eas": {

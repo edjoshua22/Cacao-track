@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-export const HeroCard = React.memo(({ stats, isDark, dayGroupsLength, totalReadings }) => {
+export const HeroCard = React.memo(({ stats, isDark, dayGroupsLength, totalReadings, totalImages }) => {
   if (!stats) return null;
 
   return (
@@ -25,6 +25,7 @@ export const HeroCard = React.memo(({ stats, isDark, dayGroupsLength, totalReadi
           { v: stats.humidAvg.toFixed(1) + "%", l: "Avg Humidity" },
           { v: stats.moistAvg.toFixed(1) + "%", l: "Avg Moisture" },
           { v: String(dayGroupsLength) + " days",  l: "Calendar Days" },
+          { v: String(totalImages || 0),            l: "Images" },
           { v: String(totalReadings),               l: "Total Readings" },
         ].map((m, i) => (
           <React.Fragment key={i}>

@@ -14,6 +14,7 @@ import container from '../src/core/di/container';
 // ── Data & Logic ──────────────────────────────────────────────────────────────
 import { useBatchList } from '../src/features/batch/presentation/hooks/useBatchList';
 import { createBatch } from './Menu/batchUtils';
+import { ChartSeriesFactory } from '../src/features/analytics/factories/ChartSeriesFactory';
 
 // ── Components ────────────────────────────────────────────────────────────────
 import { SectionHeader as SH, DayCard } from '../src/features/analytics/presentation/components/AnalyticsComponents';
@@ -25,23 +26,88 @@ export default function AnalyticsScreen() {
 
   const { batches, isLoading, error, deleteBatch } = useBatchList();
 
+  // Batch 1 is a fixed historical window. Anything after this belongs to Batch 2+.
+  const BATCH1_END_STR = '2026-01-14 22:32:21';
+  const BATCH1_END_MS = useMemo(() => new Date(2026, 0, 14, 22, 32, 21).getTime(), []);
+
   // Always default to 'batch-0' so the user sees all historical readings first
   const [selectedBatchId, setSelectedBatchId] = useState('batch-0');
   const [modalVisible, setModalVisible] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
+  const parseEntryTimeMs = useCallback((entry) => {
+    if (!entry) return 0;
+    if (typeof entry.timestamp === 'number' && isFinite(entry.timestamp)) return entry.timestamp;
+    const raw = entry.time ? String(entry.time).replace(/_/g, ' ').trim() : '';
+    if (!raw) return 0;
+
+    // Support:
+    // - "YYYY-MM-DD HH:mm:ss"
+    // - "YYYY-MM-DD HH-mm-ss"
+    // - "YYYY-MM-DD_HH-mm-ss"
+    // - "YYYY/MM/DD HH:mm:ss" (legacy)
+    const [d, t] = raw.includes(' ') ? raw.split(' ') : [raw, ''];
+    const datePart = d.replace(/\//g, '-');
+    const [y, m, day] = datePart.split('-').map(Number);
+    if (!y || !m || !day) return 0;
+    if (!t) return new Date(y, m - 1, day).getTime();
+    const [hh, mm, ss] = t.split(/[-:]/).map(Number);
+    return new Date(y, m - 1, day, hh || 0, mm || 0, ss || 0).getTime();
+  }, []);
+
   // Global Data State
   const [globalLoading, setGlobalLoading] = useState(true);
+  const [allSensorEntries, setAllSensorEntries] = useState([]);
   const [globalViewData, setGlobalViewData] = useState({
-    overviewSeries: null, dayGroups: [], stats: null, latest: null, totalReadings: 0,
+    overviewSeries: null, dayGroups: [], stats: null, latest: null, totalReadings: 0, totalImages: 0,
   });
+  const [globalCaptures, setGlobalCaptures] = useState([]);
 
   // Subscribe to global data (Batch 0)
   useEffect(() => {
     const useCase = container.resolve('getAnalyticsDataUseCase');
     const unsub = useCase.execute(
       (data) => {
-        setGlobalViewData(data);
+        const allEntries = (data?.rawEntries || []).filter(e => e?.time);
+        setAllSensorEntries(allEntries);
+
+        // Force Batch 1 (global view) to end at a fixed cutoff so new readings move to Batch 2+.
+        const entries = allEntries.filter(e => String(e.time) <= BATCH1_END_STR);
+
+        if (!entries.length) {
+          setGlobalViewData({
+            overviewSeries: null,
+            dayGroups: [],
+            stats: null,
+            latest: null,
+            totalReadings: 0,
+            totalImages: 0,
+          });
+          setGlobalLoading(false);
+          return;
+        }
+
+        const overviewSeries = ChartSeriesFactory.overview(entries);
+        const stats = ChartSeriesFactory.stats(entries);
+        const dayMap = ChartSeriesFactory.groupByDate(entries);
+        const dayGroups = Array.from(dayMap.entries()).map(([dateStr, dayEntries]) => {
+          return {
+            dateStr,
+            entries: dayEntries,
+            series: ChartSeriesFactory.forDay(dayEntries),
+            stats: ChartSeriesFactory.stats(dayEntries),
+          };
+        });
+        const latest = entries[entries.length - 1];
+
+        setGlobalViewData({
+          overviewSeries,
+          dayGroups,
+          stats,
+          latest,
+          totalReadings: entries.length,
+          totalImages: 0,
+        });
         setGlobalLoading(false);
       },
       (err) => {
@@ -49,7 +115,20 @@ export default function AnalyticsScreen() {
         setGlobalLoading(false);
       }
     );
-    return () => unsub();
+    const timelineUseCase = container.resolve('getTimelineUseCase');
+    let unsubTimeline = null;
+    timelineUseCase.execute({
+      callback: (captures) => {
+        setGlobalCaptures(captures || []);
+      }
+    }).then(res => {
+      if (res.success && res.data?.unsubscribe) unsubTimeline = res.data.unsubscribe;
+    });
+
+    return () => {
+      unsub();
+      if (unsubTimeline) unsubTimeline();
+    };
   }, []);
 
   const selectedBatch = useMemo(() => {
@@ -61,7 +140,14 @@ export default function AnalyticsScreen() {
     try {
       // Since Batch 1 is the permanent global view, real batches start at Batch 2
       const newName = `Batch ${batches.length + 2}`;
-      const createdBatchId = await createBatch(newName, "Auto-created from Analytics");
+      
+      const createdBatch = await createBatch(
+        newName,
+        "Auto-created from Analytics",
+        Date.now()
+      );
+      // Select by id if returned, otherwise keep previous behavior (some versions return data only)
+      const createdBatchId = createdBatch?.id || createdBatch;
       setSelectedBatchId(createdBatchId);
       setModalVisible(false);
     } catch (err) {
@@ -69,7 +155,7 @@ export default function AnalyticsScreen() {
     } finally {
       setIsCreating(false);
     }
-  }, [batches.length]);
+  }, [batches.length, BATCH1_END_MS]);
 
   const batchViewData = useMemo(() => {
     if (!selectedBatch) return { dayGroups: [], totalReadings: 0, stats: null };
@@ -86,17 +172,23 @@ export default function AnalyticsScreen() {
     ];
 
     const DAY_MS = 24 * 60 * 60 * 1000;
-    const startTime = parseInt(selectedBatch.createdAt || selectedBatch.startTime || Date.now());
+    const toEpochMs = (v, fallback = Date.now()) => {
+      if (v == null) return fallback;
+      if (typeof v === 'number' && isFinite(v)) return v;
+      const s = String(v).trim();
+      if (!s) return fallback;
+      if (/^\d+$/.test(s)) return Number(s);
+      const parsed = Date.parse(s);
+      return Number.isNaN(parsed) ? fallback : parsed;
+    };
+    const rawStartTime = toEpochMs(selectedBatch.createdAt || selectedBatch.startTime, Date.now());
+    let startTime = rawStartTime;
 
     // Dynamically bucket real-time global entries strictly into this batch's 7-day window
-    if (globalViewData.rawEntries) {
-      globalViewData.rawEntries.forEach(entry => {
+    if (allSensorEntries && allSensorEntries.length > 0) {
+      allSensorEntries.forEach(entry => {
         if (!entry || !entry.time) return;
-        let entryTime = entry.timestamp;
-        if (!entryTime) {
-          const parsed = new Date(entry.time.replace(/-/g, '/')).getTime();
-          entryTime = isNaN(parsed) ? startTime : parsed;
-        }
+        const entryTime = parseEntryTimeMs(entry);
 
         // Strictly drop data that is before the start time or after Day 6 (7 days later)
         if (entryTime >= startTime) {
@@ -168,12 +260,25 @@ export default function AnalyticsScreen() {
       moistAvg: totalR ? globalMoistSum / totalR : (selectedBatch.avgMoisture || 0)
     };
 
-    return { dayGroups: groups, totalReadings: totalR, stats: overallStats };
-  }, [selectedBatch, globalViewData.rawEntries]);
+    let totalImagesCount = 0;
+    if (globalCaptures && globalCaptures.length > 0) {
+      globalCaptures.forEach(cap => {
+        const t = cap.parsedDate ? cap.parsedDate.getTime() : 0;
+        if (t >= startTime) {
+          let dayIndex = Math.floor((t - startTime) / DAY_MS);
+          if (dayIndex >= 0 && dayIndex <= 6) {
+            totalImagesCount++;
+          }
+        }
+      });
+    }
+
+    return { dayGroups: groups, totalReadings: totalR, stats: overallStats, totalImages: totalImagesCount };
+  }, [selectedBatch, allSensorEntries, globalCaptures, BATCH1_END_MS, parseEntryTimeMs]);
 
   const isGlobal = selectedBatchId === 'batch-0';
-  const activeData = isGlobal ? globalViewData : batchViewData;
-  const { overviewSeries, dayGroups, stats, latest, totalReadings } = activeData;
+  const activeData = isGlobal ? { ...globalViewData, totalImages: globalCaptures.length } : batchViewData;
+  const { overviewSeries, dayGroups, stats, latest, totalReadings, totalImages } = activeData;
 
   const allBatchesOptions = [
     { id: 'batch-0', name: 'Batch 1', date: 'Starts at 2026-01-08' },
@@ -239,6 +344,7 @@ export default function AnalyticsScreen() {
               isDark={isDark}
               dayGroupsLength={dayGroups.length}
               totalReadings={totalReadings}
+              totalImages={totalImages}
             />
 
             {/* ── Overview chart (Only for Batch 1) ── */}

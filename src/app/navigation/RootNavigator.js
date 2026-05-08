@@ -13,7 +13,6 @@ import { useAppTheme }                  from '../../../context/ThemeContext';
 // ── Screens (new modular paths) ───────────────────────────────────────────────
 import OnboardingScreen from '../../features/onboarding/presentation/screens/OnboardingScreen';
 import BatchScreen      from '../../features/batch/presentation/screens/BatchScreen';
-import FermentationHistoryScreen from '../../features/fermentation/presentation/screens/FermentationHistoryScreen';
 import TimelineScreen   from '../../features/timeline/presentation/screens/TimelineScreen';
 
 // ── Screens not yet migrated (kept from original location) ────────────────────
@@ -89,7 +88,6 @@ export default function RootNavigator() {
         <Stack.Screen name="BatchDetail"       component={BatchDetail}/>
         <Stack.Screen name="GraphDetail"       component={GraphDetail}/>
         <Stack.Screen name="ImageDetail"       component={ImageDetail}/>
-        <Stack.Screen name="FermentationHistory" component={FermentationHistoryScreen}/>
       </Stack.Navigator>
     </NavigationContainer>
   );

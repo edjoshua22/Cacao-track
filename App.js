@@ -1,186 +1,344 @@
 /**
- * App.js — Root entry point with premium floating tab bar.
+ * App.js — Root entry point with premium animated floating tab bar.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, StatusBar, LogBox, Platform,
+  Animated, Easing,
 } from 'react-native';
 import { useFonts } from 'expo-font';
-import AsyncStorage                   from '@react-native-async-storage/async-storage';
-import { NavigationContainer }        from '@react-navigation/native';
-import { createBottomTabNavigator }   from '@react-navigation/bottom-tabs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { GestureHandlerRootView }     from 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons }                   from '@expo/vector-icons';
-import { LinearGradient }             from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { ThemeProvider, useAppTheme } from './context/ThemeContext';
 
 // ── Screens ───────────────────────────────────────────────────────────────────
-import MonitoringScreen          from './screens/MonitoringScreen';
-import AnalyticsScreen           from './screens/AnalyticsScreen';
-import TimelineScreen            from './screens/TimelineScreen';
-import NotificationScreen        from './screens/NotificationScreen';
-import OnboardingScreen          from './screens/OnboardingScreen';
-import BatchDetail               from './screens/Details/BatchDetail';
-import GraphDetail               from './screens/Details/GraphDetail';
-import ImageDetail               from './screens/Details/ImageDetail';
-import FermentationHistoryScreen from './screens/FermentationHistoryScreen';
+import MonitoringScreen from './screens/MonitoringScreen';
+import AnalyticsScreen from './screens/AnalyticsScreen';
+import TimelineScreen from './screens/TimelineScreen';
+import NotificationScreen from './screens/NotificationScreen';
+import OnboardingScreen from './screens/OnboardingScreen';
+import StirrerControlScreen from './screens/StirrerControlScreen';
+import BatchDetail from './screens/Details/BatchDetail';
+import GraphDetail from './screens/Details/GraphDetail';
+import ImageDetail from './screens/Details/ImageDetail';
 
 LogBox.ignoreLogs([
   'Non-serializable values were found in the navigation state',
   'Sending `onAnimatedValueUpdate`',
 ]);
 
-const Tab   = createBottomTabNavigator();
+const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 // ── Tab config ────────────────────────────────────────────────────────────────
 const TABS = [
-  { name: 'Monitoring',    icon: 'home',          label: 'Home'      },
-  { name: 'Timeline',      icon: 'images',        label: 'Timeline'  },
-  { name: 'Analytics',     icon: 'analytics',     label: 'Analytics' },
-  { name: 'Notifications', icon: 'notifications', label: 'Alerts'    },
+  { name: 'Monitoring', icon: 'home', label: 'Home' },
+  { name: 'Timeline', icon: 'images', label: 'Timeline' },
+  { name: 'Stirrer', icon: 'cog', label: 'Stirrer', isFab: true },
+  { name: 'Analytics', icon: 'analytics', label: 'Analytics' },
+  { name: 'Notifications', icon: 'notifications', label: 'Alerts' },
 ];
 
+// ── Animated Tab Icon (memoized) ──────────────────────────────────────────────
+const AnimatedTabIcon = React.memo(({ tab, focused, colors }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const labelAnim = useRef(new Animated.Value(focused ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (focused) {
+      // Single spring bounce — lightweight, no sequence needed
+      Animated.spring(scaleAnim, {
+        toValue: 1.15,
+        friction: 5,
+        tension: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        Animated.spring(scaleAnim, { toValue: 1, friction: 4, useNativeDriver: true }).start();
+      });
+      Animated.timing(labelAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    } else {
+      scaleAnim.setValue(1);
+      Animated.timing(labelAnim, { toValue: 0, duration: 120, useNativeDriver: true }).start();
+    }
+  }, [focused]);
+
+  return (
+    <Animated.View style={tabStyles.tabIconContainer}>
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <View style={[
+          tabStyles.iconWrap,
+          focused && {
+            backgroundColor: colors.primary + '20',
+            borderColor: colors.primary + '30',
+            borderWidth: 1.5,
+          },
+        ]}>
+          <Ionicons
+            name={focused ? tab.icon : `${tab.icon}-outline`}
+            size={focused ? 23 : 21}
+            color={focused ? colors.primary : colors.subtext}
+          />
+        </View>
+      </Animated.View>
+
+      {/* Label fades in when focused */}
+      <Animated.Text style={[
+        tabStyles.label,
+        { color: colors.primary, fontWeight: '700', opacity: labelAnim },
+      ]}>
+        {tab.label}
+      </Animated.Text>
+
+    </Animated.View>
+  );
+});
+
+// ── Animated FAB Button (memoized) ────────────────────────────────────────────
+const AnimatedFab = React.memo(({ colors, onPress }) => {
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(0.35)).current;
+
+  // Single lightweight opacity pulse — no scale, just opacity breathing
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.9, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.25, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop(); // cleanup on unmount
+  }, []);
+
+  const handlePress = useCallback(() => {
+    // Quick cog spin + scale bounce
+    spinAnim.setValue(0);
+    Animated.parallel([
+      Animated.timing(spinAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.sequence([
+        Animated.timing(scaleAnim, { toValue: 0.88, duration: 80, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 4, tension: 300, useNativeDriver: true }),
+      ]),
+    ]).start();
+    onPress();
+  }, [onPress]);
+
+  const cogRotation = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
+  return (
+    <View style={tabStyles.fabContainer}>
+      {/* Subtle pulsing ring — opacity only, no transform */}
+      <Animated.View style={[
+        tabStyles.fabGlowRing,
+        { borderColor: colors.primary, opacity: pulseAnim },
+      ]} />
+
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <TouchableOpacity activeOpacity={0.9} onPress={handlePress}>
+          <LinearGradient
+            colors={[colors.primary, colors.primaryDark || '#8B5A2B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={tabStyles.fabGradient}
+          >
+            <View style={tabStyles.fabInnerRing}>
+              <Animated.View style={{ transform: [{ rotate: cogRotation }] }}>
+                <Ionicons name="cog" size={28} color="#fff" />
+              </Animated.View>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+});
+
 // ── Premium Custom Tab Bar ────────────────────────────────────────────────────
-function CustomTabBar({ state, descriptors, navigation }) {
+function CustomTabBar({ state, descriptors, navigation, onStirrerPress }) {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
 
   return (
     <View style={[
-      tabStyles.wrapper,
-      { paddingBottom: insets.bottom + 8, backgroundColor: colors.tabBar }
+      tabStyles.outerWrap,
+      { paddingBottom: insets.bottom },
     ]}>
-      {/* Top border accent line */}
-      <View style={[tabStyles.topBorder, { backgroundColor: colors.border }]} />
+      <View style={[
+        tabStyles.wrapper,
+        {
+          backgroundColor: isDark ? colors.tabBar + 'F5' : colors.tabBar + 'F8',
+          borderColor: colors.border,
+        },
+      ]}>
+        <View style={tabStyles.row}>
+          {state.routes.map((route, index) => {
+            const tab = TABS[index];
+            const focused = state.index === index;
 
-      <View style={tabStyles.row}>
-        {state.routes.map((route, index) => {
-          const tab     = TABS[index];
-          const focused = state.index === index;
+            // ── Center FAB (Stirrer) ────────────────────────────────────────
+            if (tab.isFab) {
+              return (
+                <View key="stirrer-fab" style={tabStyles.tab}>
+                  <AnimatedFab colors={colors} onPress={onStirrerPress} />
+                </View>
+              );
+            }
 
-          const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
-          };
+            const onPress = () => {
+              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+            };
 
-          return (
-            <TouchableOpacity
-              key={route.key}
-              onPress={onPress}
-              activeOpacity={0.7}
-              style={tabStyles.tab}
-            >
-              {/* Active pill background */}
-              {focused && (
-                <LinearGradient
-                  colors={[colors.primary + '30', colors.primary + '10']}
-                  style={tabStyles.activePill}
-                />
-              )}
-
-              {/* Icon */}
-              <View style={[
-                tabStyles.iconWrap,
-                focused && { backgroundColor: colors.primary + '20' },
-              ]}>
-                <Ionicons
-                  name={focused ? tab.icon : `${tab.icon}-outline`}
-                  size={22}
-                  color={focused ? colors.primary : colors.subtext}
-                />
-              </View>
-
-              {/* Label */}
-              <Text style={[
-                tabStyles.label,
-                { color: focused ? colors.primary : colors.subtext },
-                focused && { fontWeight: '700' },
-              ]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+            return (
+              <TouchableOpacity
+                key={route.key}
+                onPress={onPress}
+                activeOpacity={0.7}
+                style={tabStyles.tab}
+              >
+                <AnimatedTabIcon tab={tab} focused={focused} colors={colors} />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
 }
 
 const tabStyles = StyleSheet.create({
+  outerWrap: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+  },
   wrapper: {
-    borderTopWidth: 0,
-    elevation: 24,
+    borderRadius: 20,
+    marginBottom: 6,
+    borderWidth: 1,
+    elevation: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
   },
-  topBorder: {
-    height: 1,
-    width: '100%',
-    opacity: 0.4,
-  },
   row: {
     flexDirection: 'row',
-    paddingTop: 10,
-    paddingHorizontal: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
-    position: 'relative',
+    paddingVertical: 2,
   },
-  activePill: {
-    position:     'absolute',
-    top:          -4,
-    left:         8,
-    right:        8,
-    bottom:       -4,
-    borderRadius: 16,
+  tabIconContainer: {
+    alignItems: 'center',
   },
   iconWrap: {
-    width:         40,
-    height:        40,
-    borderRadius:  20,
-    alignItems:    'center',
-    justifyContent:'center',
-    marginBottom:   2,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: {
-    fontSize:    10,
-    fontWeight:  '600',
-    letterSpacing: 0.3,
-    marginTop:   2,
+    fontSize: 9,
+    letterSpacing: 0.5,
+    marginTop: 1,
+  },
+
+
+  // ── FAB ──────────────────────────────────────────────────────────────────
+  fabContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -30,
+    width: 70,
+    height: 70,
+  },
+  fabGlowRing: {
+    position: 'absolute',
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 2,
+  },
+  fabGradient: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+  },
+  fabInnerRing: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
 // ── Bottom Tab Navigator ──────────────────────────────────────────────────────
+// Placeholder screen for the Stirrer tab (never actually shown — FAB opens modal instead)
+function StirrerPlaceholder() {
+  return <View style={{ flex: 1 }} />;
+}
+
 function MainTabs() {
+  const [stirrerVisible, setStirrerVisible] = useState(false);
+
   return (
-    <Tab.Navigator
-      tabBar={props => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
-      {TABS.map(tab => (
-        <Tab.Screen
-          key={tab.name}
-          name={tab.name}
-          component={
-            tab.name === 'Monitoring'    ? MonitoringScreen   :
-            tab.name === 'Timeline'      ? TimelineScreen     :
-            tab.name === 'Analytics'     ? AnalyticsScreen    :
-            NotificationScreen
-          }
-        />
-      ))}
-    </Tab.Navigator>
+    <>
+      <Tab.Navigator
+        tabBar={props => (
+          <CustomTabBar {...props} onStirrerPress={() => setStirrerVisible(true)} />
+        )}
+        screenOptions={{ headerShown: false }}
+      >
+        {TABS.map(tab => (
+          <Tab.Screen
+            key={tab.name}
+            name={tab.name}
+            component={
+              tab.name === 'Monitoring' ? MonitoringScreen :
+                tab.name === 'Timeline' ? TimelineScreen :
+                  tab.name === 'Stirrer' ? StirrerPlaceholder :
+                    tab.name === 'Analytics' ? AnalyticsScreen :
+                      NotificationScreen
+            }
+            listeners={tab.isFab ? {
+              tabPress: e => { e.preventDefault(); setStirrerVisible(true); },
+            } : undefined}
+          />
+        ))}
+      </Tab.Navigator>
+
+      <StirrerControlScreen
+        visible={stirrerVisible}
+        onClose={() => setStirrerVisible(false)}
+      />
+    </>
   );
 }
 
@@ -191,12 +349,11 @@ function RootStack({ initialRoute }) {
       initialRouteName={initialRoute}
       screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}
     >
-      <Stack.Screen name="Onboarding"          component={OnboardingScreen}          />
-      <Stack.Screen name="MainTabs"            component={MainTabs}                  />
-      <Stack.Screen name="BatchDetail"         component={BatchDetail}               />
-      <Stack.Screen name="GraphDetail"         component={GraphDetail}               />
-      <Stack.Screen name="ImageDetail"         component={ImageDetail}               />
-      <Stack.Screen name="FermentationHistory" component={FermentationHistoryScreen} />
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+      <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen name="BatchDetail" component={BatchDetail} />
+      <Stack.Screen name="GraphDetail" component={GraphDetail} />
+      <Stack.Screen name="ImageDetail" component={ImageDetail} />
     </Stack.Navigator>
   );
 }
@@ -213,7 +370,7 @@ function AppShell() {
     const checkOnboarding = async () => {
       // DEV: reset onboarding each launch for testing. Remove __DEV__ block before shipping.
       if (__DEV__) {
-        await AsyncStorage.removeItem('onboardingComplete').catch(() => {});
+        await AsyncStorage.removeItem('onboardingComplete').catch(() => { });
       }
       const value = await AsyncStorage.getItem('onboardingComplete').catch(() => null);
       setInitialRoute(value === 'true' ? 'MainTabs' : 'Onboarding');

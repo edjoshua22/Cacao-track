@@ -9,6 +9,16 @@ import { mapBatchToViewModel } from '../viewmodels/BatchViewModel';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function toEpochMs(v, fallback = Date.now()) {
+  if (v == null) return fallback;
+  if (typeof v === 'number' && isFinite(v)) return v;
+  const s = String(v).trim();
+  if (!s) return fallback;
+  if (/^\d+$/.test(s)) return Number(s);
+  const parsed = Date.parse(s);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
 /**
  * Process raw batch Firebase data into day buckets (day0–day6) for analytics.
  * @param {object} batchData
@@ -32,7 +42,7 @@ function processBatchData(batchData, batchId, endTime = Infinity) {
     };
 
     if (batchData.sensorData) {
-      const startTime = parseInt(batchData.createdAt || batchData.startTime || Date.now());
+      const startTime = toEpochMs(batchData.createdAt || batchData.startTime, Date.now());
       const sensorEntries = Array.isArray(batchData.sensorData)
         ? batchData.sensorData
         : Object.values(batchData.sensorData);
@@ -41,8 +51,17 @@ function processBatchData(batchData, batchId, endTime = Infinity) {
         if (!entry || !entry.time) return;
         let entryTime = entry.timestamp;
         if (!entryTime) {
-          const parsed = new Date(entry.time.replace(/-/g, '/')).getTime();
-          entryTime = isNaN(parsed) ? startTime : parsed;
+          let cleanTime = String(entry.time).replace(/_/g, ' ');
+          if (cleanTime.includes(' ')) {
+            const parts = cleanTime.split(' ');
+            const datePart = parts[0].replace(/-/g, '/');
+            const timePart = parts[1].replace(/-/g, ':');
+            cleanTime = `${datePart} ${timePart}`;
+          } else {
+            cleanTime = cleanTime.replace(/-/g, '/');
+          }
+          const parsed = new Date(cleanTime).getTime();
+          entryTime = isNaN(parsed) ? 0 : parsed;
         }
         
         // Ensure data belongs strictly to this batch's timeline
@@ -96,8 +115,8 @@ export const useBatchList = () => {
         unsubscribe = batchRepo.subscribeToUserBatches(userId, (entities) => {
           // Sort entities by createdAt descending so index 0 is the newest batch
           const sortedEntities = [...entities].sort((a, b) => {
-            const timeA = parseInt(a.createdAt || a.startTime || 0);
-            const timeB = parseInt(b.createdAt || b.startTime || 0);
+            const timeA = toEpochMs(a.createdAt || a.startTime, 0);
+            const timeB = toEpochMs(b.createdAt || b.startTime, 0);
             return timeB - timeA;
           });
 
@@ -107,7 +126,7 @@ export const useBatchList = () => {
             // The endTime for this batch is the startTime of the batch created AFTER it
             // Since sorted descending, the batch created after it is at index - 1
             const endTime = index > 0 
-              ? parseInt(sortedEntities[index - 1].createdAt || sortedEntities[index - 1].startTime || Date.now())
+              ? toEpochMs(sortedEntities[index - 1].createdAt || sortedEntities[index - 1].startTime, Date.now())
               : Infinity;
 
             // Re-run day-bucket processing using the raw sensorData strictly within its time window

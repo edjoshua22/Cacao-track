@@ -60,13 +60,12 @@ const processHistory = (stagesData, historyVal, batchStartTime) => {
     const moisture    = parseFloat(entry.soil ?? 0) || 0;
     const reading     = { timestamp: entryTime, temperature, humidity, moisture, time: entry.time || key };
 
-    if (entryTime >= batchStartTime) {
-      stagesData.day0.sensorData.push(reading);
-      allReadings.push(reading);
-    } else if (entryTime >= batchStartTime - ONE_WEEK_MS) {
-      const daysBeforeStart = Math.floor((batchStartTime - entryTime) / (24 * 60 * 60 * 1000));
-      const dayKey = `day${Math.min(6, Math.max(1, daysBeforeStart))}`;
+    // Only include data from batch start time up to 7 days later
+    if (entryTime >= batchStartTime && entryTime <= batchStartTime + ONE_WEEK_MS) {
+      const daysAfterStart = Math.floor((entryTime - batchStartTime) / (24 * 60 * 60 * 1000));
+      const dayKey = `day${Math.min(6, Math.max(0, daysAfterStart))}`;
       if (stagesData[dayKey]) stagesData[dayKey].sensorData.push(reading);
+      allReadings.push(reading);
     }
   });
 
@@ -82,9 +81,10 @@ const processHistory = (stagesData, historyVal, batchStartTime) => {
  * @param {number} batchStartTime
  */
 const processCaptures = async (stagesData, capturesVal, batchStartTime) => {
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
   const captureEntries = Object.entries(capturesVal)
     .map(([timestamp, url]) => ({ timestamp, url, imgTimestamp: parseInt(timestamp) || 0 }))
-    .filter(img => img.imgTimestamp >= batchStartTime)
+    .filter(img => img.imgTimestamp >= batchStartTime && img.imgTimestamp <= batchStartTime + ONE_WEEK_MS)
     .sort((a, b) => b.imgTimestamp - a.imgTimestamp)
     .slice(0, 15);
 
@@ -152,8 +152,7 @@ export const createBatch = async (name, notes = '', customStartTime = null) => {
 
   const db            = getDatabase(app);
   const batchStartTime = customStartTime || Date.now();
-  const sevenDaysAgo  = new Date(batchStartTime - 7 * 24 * 60 * 60 * 1000);
-  const startKey      = sevenDaysAgo.toISOString().split('T')[0] + '_00-00-00';
+  const startKey      = new Date(batchStartTime).toISOString().split('T')[0] + '_00-00-00';
 
   const [historySnapshot, capturesSnapshot] = await Promise.all([
     get(query(ref(db, 'history'), orderByKey(), startAt(startKey))),

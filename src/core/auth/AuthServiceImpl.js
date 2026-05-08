@@ -29,7 +29,7 @@ export class AuthServiceImpl extends IAuthService {
           this._currentUser = user;
           unsubscribe();
           if (user) {
-            if (__DEV__) console.log('✅ User authenticated:', user.uid);
+
             resolve(user);
           } else {
             signInAnonymously(auth)

@@ -18,14 +18,14 @@ export const initializeAuth = () => {
         unsubscribe();
         
         if (user) {
-          console.log('✅ User authenticated:', user.uid);
+
           resolve(user);
         } else {
           // Sign in anonymously if no user is authenticated
           signInAnonymously(auth)
             .then((userCredential) => {
               currentUser = userCredential.user;
-              console.log('✅ Anonymous user signed in:', currentUser.uid);
+              if (__DEV__) console.log('✅ Anonymous user signed in:', currentUser.uid);
               resolve(currentUser);
             })
             .catch((error) => {
@@ -60,7 +60,7 @@ export const signOutUser = async () => {
     await signOut(auth);
     currentUser = null;
     authPromise = null;
-    console.log('✅ User signed out');
+    if (__DEV__) console.log('✅ User signed out');
   } catch (error) {
     console.error('❌ Sign out failed:', error);
     throw error;
